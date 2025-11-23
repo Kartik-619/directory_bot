@@ -2,6 +2,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as dotenv from 'dotenv';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
+import * as path from 'path';
+import * as fs from 'fs';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -9,9 +12,8 @@ dotenv.config();
 const app = express();
 const PORT = 3001;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const SHEETS_RANGE = 'Sheet1!A:B'; // Assuming URL in Column A, Questions in Column B
+const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx'; // Path to your XLSX file
+const SHEETS_RANGE = 'Sheet1!A:B'; // For reference, but we'll read the entire sheet
 
 // --- Setup Middlewares ---
 app.use(cors({
@@ -33,28 +35,36 @@ interface SiteResult {
 }
 
 /**
- * Fetches all raw data from Google Sheets (URLs and Questions) and structures it.
+ * Reads data from local XLSX file and structures it.
  * This is used internally by both the /sites and /generate-answers endpoints.
  */
 async function fetchAllSiteData(): Promise<SiteResult[]> {
-    if (!GOOGLE_SHEET_ID || !GOOGLE_API_KEY) {
-        console.error("Missing GOOGLE_SHEET_ID or GOOGLE_API_KEY in .env");
-        throw new Error("Missing Google Sheets credentials. Cannot fetch data.");
+    if (!DATA_FILE_PATH) {
+        console.error("Missing DATA_FILE_PATH in .env");
+        throw new Error("Missing data file path. Cannot fetch data.");
     }
 
-    const sheetsApiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${SHEETS_RANGE}?key=${GOOGLE_API_KEY}`;
+    // Resolve the file path (handles relative and absolute paths)
+    const resolvedPath = path.resolve(process.cwd(), DATA_FILE_PATH);
     
     try {
-        const response = await axios.get(sheetsApiUrl);
-        
-        if (response.status !== 200) {
-            throw new Error(`Sheets API call failed: ${response.status} - ${response.statusText}`);
+        // Check if file exists
+        if (!fs.existsSync(resolvedPath)) {
+            throw new Error(`Data file not found at: ${resolvedPath}`);
         }
+
+        // Read the XLSX file
+        const workbook = XLSX.readFile(resolvedPath);
         
-        const data = response.data;
-        const rawRows = data.values;
-        // Skip header row
-        const dataRows = rawRows ? rawRows.slice(1) : []; 
+        // Get the first sheet (you can modify this to use a specific sheet name)
+        const sheetName = workbook.SheetNames[0]; // Use first sheet
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert sheet to JSON
+        const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+        
+        // Skip header row and filter out empty rows
+        const dataRows = data ? data.slice(1).filter(row => row.length > 0 && (row[0] || row[1])) : [];
         
         const siteData: SiteResult[] = [];
 
@@ -74,22 +84,19 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
                     sources: [], 
                 }));
 
-                // Instead of pushing multiple entries for the same site, this version creates a unique list of site questions.
-                // Since the sheet format implies one row per site, this is fine, but we return SiteResult[].
                 siteData.push({
                     siteUrl: siteUrl,
                     questions: newQuestions,
                 });
             }
         });
+
+        console.log(`Successfully loaded ${siteData.length} sites from XLSX file`);
         return siteData;
 
     } catch (error) {
-        console.error("Error fetching Google Sheet data:", error);
-        if (axios.isAxiosError(error)) {
-            throw new Error(`Google Sheets error: ${error.response?.status} - ${error.response?.data}`);
-        }
-        throw new Error(`Google Sheets error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error("Error reading XLSX file:", error);
+        throw new Error(`XLSX file error: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
@@ -205,7 +212,7 @@ app.post('/api/generate-answers', async (req: Request, res: Response) => {
         const targetSite = allSiteData.find(site => site.siteUrl === siteUrl);
 
         if (!targetSite) {
-            return res.status(404).json({ error: `Site '${siteUrl}' not found in Google Sheet data.` });
+            return res.status(404).json({ error: `Site '${siteUrl}' not found in data file.` });
         }
 
         const answeredSite: SiteResult = {
@@ -241,6 +248,7 @@ app.post('/api/generate-answers', async (req: Request, res: Response) => {
 // --- Server Startup ---
 app.listen(PORT, () => {
     console.log(`\n\n✅ Backend running at http://localhost:${PORT}`);
-    console.log("🛠️  Remember to set GEMINI_API_KEY, GOOGLE_SHEET_ID, and GOOGLE_API_KEY in your '.env' file.");
-    console.log("🛠️  Ensure your Google Sheet (Sheet1) has URL in column A and comma-separated questions in column B.");
+    console.log("🛠️  Remember to set GEMINI_API_KEY in your '.env' file.");
+    console.log("🛠️  Ensure your XLSX file has URL in column A and comma-separated questions in column B.");
+    console.log(`🛠️  Using data file: ${DATA_FILE_PATH}`);
 });
