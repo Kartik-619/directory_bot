@@ -17,7 +17,7 @@ const MAX_ROWS = 1000;
 
 // Initialize Gemini SDK
 let genAI: GoogleGenerativeAI | null = null;
-const MODEL_NAME = 'gemini-pro'; // Using a stable model
+const MODEL_NAME = 'gemini-2.5-flash';
 
 // Rate limiting storage
 const rateLimit = new Map<string, number>();
