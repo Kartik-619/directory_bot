@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { gsap } from 'gsap';
 
 interface Site {
   url: string;
@@ -12,11 +13,47 @@ export default function Home() {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const headerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Fetch available sites on component mount
   useEffect(() => {
     fetchSites();
   }, []);
+
+  // Animation when component mounts and sites load
+  useEffect(() => {
+    if (!loading && sites.length > 0) {
+      animatePageIn();
+    }
+  }, [loading, sites]);
+
+  const animatePageIn = () => {
+    // Animate header
+    if (headerRef.current) {
+      gsap.fromTo(headerRef.current, 
+        { y: -50, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }
+      );
+    }
+
+    // Animate grid items with stagger
+    if (gridRef.current) {
+      const cards = gridRef.current.querySelectorAll('.site-card');
+      gsap.fromTo(cards,
+        { y: 60, opacity: 0, scale: 0.9 },
+        { 
+          y: 0, 
+          opacity: 1, 
+          scale: 1, 
+          duration: 0.6, 
+          stagger: 0.1,
+          ease: "back.out(1.7)",
+          delay: 0.3
+        }
+      );
+    }
+  };
 
   const fetchSites = async () => {
     try {
@@ -57,16 +94,19 @@ export default function Home() {
   if (loading) {
     return (
       <div className="container">
-        <div className="loading">Loading sites...</div>
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          Loading sites...
+        </div>
       </div>
     );
   }
 
   return (
     <div className="container">
-      <header className="header">
-        <h1 className="title">AI Research Assistant</h1>
-        <p className="subtitle">Select a website to generate AI-powered answers</p>
+      <header ref={headerRef} className="header">
+        <h1 className="title">Directory Bot</h1>
+        <p className="subtitle">Select a website to generate AI-powered answers and ease your startup launch!!</p>
       </header>
 
       {/* Error Display */}
@@ -77,7 +117,7 @@ export default function Home() {
       )}
 
       {/* Sites Grid */}
-      <div className="sites-grid">
+      <div ref={gridRef} className="sites-grid">
         {sites.map((site) => (
           <SiteCard key={site.url} site={site} />
         ))}
@@ -94,17 +134,81 @@ export default function Home() {
   );
 }
 
-// Site Card Component
+// Site Card Component with GSAP animations
 function SiteCard({ site }: { site: Site }) {
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
+  const arrowRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (cardRef.current) {
+      gsap.to(cardRef.current, {
+        y: -8,
+        scale: 1.02,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+    
+    if (iconRef.current) {
+      gsap.to(iconRef.current, {
+        rotation: 360,
+        duration: 0.6,
+        ease: "power2.out"
+      });
+    }
+
+    if (arrowRef.current) {
+      gsap.to(arrowRef.current, {
+        x: 8,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (cardRef.current) {
+      gsap.to(cardRef.current, {
+        y: 0,
+        scale: 1,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+
+    if (iconRef.current) {
+      gsap.to(iconRef.current, {
+        rotation: 0,
+        duration: 0.6,
+        ease: "power2.out"
+      });
+    }
+
+    if (arrowRef.current) {
+      gsap.to(arrowRef.current, {
+        x: 0,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+  };
+
   return (
-    <Link href={`/site/${encodeURIComponent(site.url)}`} className="site-card">
+    <Link 
+      href={`/site/${encodeURIComponent(site.url)}`} 
+      className="site-card"
+      ref={cardRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className="card-content">
-        <div className="site-icon">
+        <div ref={iconRef} className="site-icon">
           {getSiteIcon(site.url)}
         </div>
         <h3 className="site-name">{site.name}</h3>
         <p className="site-url">{site.url}</p>
-        <div className="card-arrow">→</div>
+        <div ref={arrowRef} className="card-arrow">→</div>
       </div>
     </Link>
   );

@@ -277,7 +277,7 @@
   text-align: center;
   padding: 3rem;
 }
-
+/* Enhanced CSS for animations */
 .loading-spinner {
   border: 3px solid #f3f3f3;
   border-top: 3px solid #007acc;
@@ -286,6 +286,35 @@
   height: 40px;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Ensure cards have transform origin for smooth scaling */
+.site-card {
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.site-icon {
+  will-change: transform;
+}
+
+.card-arrow {
+  will-change: transform;
 }
 
 @keyframes spin {
