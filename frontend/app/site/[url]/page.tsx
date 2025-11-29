@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChatInterface } from '../../component/home/ChatInterface';
 
 interface SiteQuestion {
   id: number;
@@ -24,17 +23,12 @@ export default function SitePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [answersGenerated, setAnswersGenerated] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
 
   // Decode the URL from the route parameter
   const siteUrl = decodeURIComponent(params.url as string);
 
-  const generateAnswers = async (isRegenerate = false) => {
-    if (isRegenerate) {
-      setRegenerating(true);
-    } else {
-      setLoading(true);
-    }
+  const generateAnswers = async () => {
+    setLoading(true);
     setError('');
 
     try {
@@ -59,159 +53,92 @@ export default function SitePage() {
       console.error('Error generating answers:', err);
     } finally {
       setLoading(false);
-      setRegenerating(false);
     }
   };
 
   const getDisplayName = (url: string): string => {
     try {
       const domain = new URL(url).hostname;
-      return domain.replace(/^www\./, '').split('.')[0];
+      return domain.replace(/^www\./, '');
     } catch {
-      return url.replace(/^https?:\/\//, '').replace(/\/$/, '').split('/')[0];
+      return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     }
   };
 
-  const handleRegenerate = () => {
-    generateAnswers(true);
-  };
-
   return (
-    <div className="site-page">
+    <div className="container">
       {/* Header */}
-      <header className="site-header">
-        <div className="header-content">
-          <Link href="/" className="back-button">
-            ← Back to Sites
-          </Link>
-          <div className="site-info">
-            <h1 className="site-title">{getDisplayName(siteUrl)}</h1>
-            <p className="site-url-display">{siteUrl}</p>
-          </div>
-        </div>
+      <header className="header">
+        <Link href="/" className="back-button">
+          ← Back to Sites
+        </Link>
+        <h1 className="title">{getDisplayName(siteUrl)}</h1>
+        <p className="site-url">{siteUrl}</p>
       </header>
 
-      {/* Main Content */}
-      <div className="site-content">
-        {/* Left Side - Generate Answers & Results */}
-        <div className="content-main">
-          {/* Generate Answers Section */}
-          {!answersGenerated && (
-            <div className="generate-section">
-              <div className="generate-card">
-                <div className="generate-icon">🚀</div>
-                <h2>Generate AI-Powered Answers</h2>
-                <p>Get instant AI-generated answers to common questions about this website. Our AI will analyze the site and provide comprehensive responses.</p>
-                <button
-                  onClick={() => generateAnswers(false)}
-                  disabled={loading}
-                  className={`generate-button ${loading ? 'loading' : ''}`}
-                >
-                  {loading ? (
-                    <>
-                      <div className="button-spinner"></div>
-                      Generating Answers...
-                    </>
-                  ) : (
-                    'Generate Answers'
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <div className="error-message">
-              <div className="error-icon">⚠️</div>
-              <div className="error-content">
-                <strong>Error</strong>
-                <p>{error}</p>
-                <button onClick={() => generateAnswers(false)} className="retry-button">
-                  Try Again
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {loading && (
-            <div className="loading-section">
-              <div className="loading-content">
-                <div className="loading-spinner-large"></div>
-                <h3>Generating AI Answers</h3>
-                <p>Analyzing the website and generating comprehensive answers...</p>
-                <div className="loading-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Results Display */}
-          {siteData && (
-            <div className="results-section">
-              <div className="results-header">
-                <div className="results-title">
-                  <h2>Generated Answers</h2>
-                  <span className="results-count">{siteData.questions.length} questions answered</span>
-                </div>
-                <button 
-                  onClick={handleRegenerate}
-                  disabled={regenerating}
-                  className={`regenerate-button ${regenerating ? 'loading' : ''}`}
-                >
-                  {regenerating ? (
-                    <>
-                      <div className="button-spinner"></div>
-                      Regenerating...
-                    </>
-                  ) : (
-                    '🔄 Regenerate All'
-                  )}
-                </button>
-              </div>
-              
-              <div className="questions-grid">
-                {siteData.questions.map((questionItem) => (
-                  <QuestionCard 
-                    key={questionItem.id} 
-                    question={questionItem} 
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Generate Answers Section */}
+      {!answersGenerated && (
+        <div className="generate-section">
+          <div className="generate-card">
+            <h2>Generate AI Answers</h2>
+            <p>Click the button below to generate AI-powered answers for all questions about this site.</p>
+            <button
+              onClick={generateAnswers}
+              disabled={loading}
+              className="generate-button"
+            >
+              {loading ? 'Generating Answers...' : 'Generate Answers'}
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Right Side - Chat Interface */}
-        <div className="content-sidebar">
-          <ChatInterface 
-            siteUrl={siteUrl} 
-            siteName={getDisplayName(siteUrl)}
-          />
+      {/* Error Display */}
+      {error && (
+        <div className="error-message">
+          {error}
         </div>
-      </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="loading-section">
+          <div className="loading-spinner"></div>
+          <p>Generating AI answers... This may take a moment.</p>
+        </div>
+      )}
+
+      {/* Results Display */}
+      {siteData && (
+        <div className="results-section">
+          <div className="results-header">
+            <h2>Generated Answers</h2>
+            <button 
+              onClick={generateAnswers}
+              disabled={loading}
+              className="regenerate-button"
+            >
+              Regenerate All
+            </button>
+          </div>
+          
+          <div className="questions-grid">
+            {siteData.questions.map((questionItem) => (
+              <QuestionCard 
+                key={questionItem.id} 
+                question={questionItem} 
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Updated Question Card Component
+// Question Card Component
 function QuestionCard({ question }: { question: SiteQuestion }) {
   const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
-    }
-  };
 
   return (
     <div className={`question-card ${expanded ? 'expanded' : ''}`}>
@@ -219,44 +146,21 @@ function QuestionCard({ question }: { question: SiteQuestion }) {
         className="question-header"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="question-main">
-          <span className="question-id">Q{question.id}</span>
-          <h3 className="question-text">{question.question}</h3>
-        </div>
-        <div className="question-actions">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              copyToClipboard(question.answer);
-            }}
-            className={`copy-button ${copied ? 'copied' : ''}`}
-            title="Copy answer"
-          >
-            {copied ? '✓' : '📋'}
-          </button>
-          <div className="expand-icon">
-            {expanded ? '−' : '+'}
-          </div>
+        <h3 className="question-text">Q{question.id}: {question.question}</h3>
+        <div className="expand-icon">
+          {expanded ? '−' : '+'}
         </div>
       </div>
       
       {expanded && (
         <div className="answer-content">
           <div className="answer-section">
-            <div className="answer-header">
-              <strong>AI Answer:</strong>
-              <button
-                onClick={() => copyToClipboard(question.answer)}
-                className={`copy-answer-button ${copied ? 'copied' : ''}`}
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
+            <strong>Answer:</strong>
             <p className="answer-text">{question.answer}</p>
           </div>
 
           {/* Sources */}
-          {question.sources && question.sources.length > 0 && (
+          {question.sources.length > 0 && (
             <div className="sources-section">
               <strong>Sources:</strong>
               <ul className="sources-list">
@@ -268,8 +172,7 @@ function QuestionCard({ question }: { question: SiteQuestion }) {
                       rel="noopener noreferrer"
                       className="source-link"
                     >
-                      <span className="source-title">{source.title}</span>
-                      <span className="source-url">{new URL(source.uri).hostname}</span>
+                      {source.title}
                     </a>
                   </li>
                 ))}
