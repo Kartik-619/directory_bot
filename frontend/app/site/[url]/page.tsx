@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useOnboarding } from '../../context/OnboardingContext';
+import { SiteService } from '../../services/siteService';
 
 interface SiteQuestion {
   id: number;
@@ -19,6 +21,7 @@ interface SiteResult {
 export default function SitePage() {
   const params = useParams();
   const router = useRouter();
+  const { appInfo } = useOnboarding();
   const [siteData, setSiteData] = useState<SiteResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -26,26 +29,39 @@ export default function SitePage() {
 
   // Decode the URL from the route parameter
   const siteUrl = decodeURIComponent(params.url as string);
+  
+  // Check if this is a custom analysis
+  const isCustomAnalysis = siteUrl.startsWith('custom-analysis-') || 
+                          (appInfo && siteUrl.includes(appInfo.name.toLowerCase().replace(/\s+/g, '-')));
 
   const generateAnswers = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/generate-answers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ siteUrl }),
-      });
+      let data: SiteResult;
+      
+      if (isCustomAnalysis && appInfo) {
+        // Use custom analysis endpoint
+        data = await SiteService.generateCustomAnswers(appInfo);
+      } else {
+        // Use regular site analysis endpoint
+        const response = await fetch('http://localhost:3001/api/generate-answers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ siteUrl }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate answers');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate answers');
+        }
+
+        data = await response.json();
       }
 
-      const data: SiteResult = await response.json();
       setSiteData(data);
       setAnswersGenerated(true);
     } catch (err) {
@@ -57,6 +73,10 @@ export default function SitePage() {
   };
 
   const getDisplayName = (url: string): string => {
+    if (isCustomAnalysis && appInfo) {
+      return `${appInfo.name} - Custom Analysis`;
+    }
+    
     try {
       const domain = new URL(url).hostname;
       return domain.replace(/^www\./, '');
@@ -73,7 +93,15 @@ export default function SitePage() {
           ← Back to Sites
         </Link>
         <h1 className="title">{getDisplayName(siteUrl)}</h1>
-        <p className="site-url">{siteUrl}</p>
+        {isCustomAnalysis && appInfo ? (
+          <div className="app-info">
+            <p className="app-type">{appInfo.type.toUpperCase()} Application</p>
+            <p className="app-description">{appInfo.description}</p>
+            <p className="app-audience">Target Audience: {appInfo.targetAudience}</p>
+          </div>
+        ) : (
+          <p className="site-url">{siteUrl}</p>
+        )}
       </header>
 
       {/* Generate Answers Section */}
@@ -81,7 +109,12 @@ export default function SitePage() {
         <div className="generate-section">
           <div className="generate-card">
             <h2>Generate AI Answers</h2>
-            <p>Click the button below to generate AI-powered answers for all questions about this site.</p>
+            <p>
+              {isCustomAnalysis && appInfo 
+                ? `Generate personalized insights and recommendations for ${appInfo.name} based on your app profile.`
+                : 'Click the button below to generate AI-powered answers for all questions about this site.'
+              }
+            </p>
             <button
               onClick={generateAnswers}
               disabled={loading}
