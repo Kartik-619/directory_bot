@@ -50,6 +50,16 @@ interface SiteResult {
     questions: SiteQuestion[];
 }
 
+interface AppInfo {
+    url: string;
+    name: string;
+    type: 'saas' | 'ecommerce' | 'blog' | 'portfolio' | 'webapp' | 'other';
+    description: string;
+    targetAudience: string;
+    mainFeatures: string[];
+    techStack: string[];
+}
+
 /**
  * Validate all required environment variables and initialize the AI SDK
  */
@@ -203,6 +213,39 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
 }
 
 /**
+ * Generate custom questions based on app information
+ */
+function generateCustomQuestions(appInfo: AppInfo): string[] {
+    const baseQuestions = [
+        `What are the best practices for ${appInfo.type} applications like ${appInfo.name}?`,
+        `How can ${appInfo.name} improve user engagement for ${appInfo.targetAudience}?`,
+        `What are the key success metrics for ${appInfo.type} applications?`,
+        `How can ${appInfo.name} optimize conversion rates?`,
+        `What are the latest trends in ${appInfo.type} development?`
+    ];
+
+    const featureQuestions = appInfo.mainFeatures.slice(0, 3).map(feature => 
+        `How can ${appInfo.name} optimize ${feature.toLowerCase()} for better user experience?`
+    );
+
+    const techQuestions = appInfo.techStack.slice(0, 2).map(tech => 
+        `What are the best practices for ${tech} in ${appInfo.type} applications?`
+    );
+
+    const audienceQuestions = [
+        `What are the pain points of ${appInfo.targetAudience} that ${appInfo.name} should address?`,
+        `How can ${appInfo.name} better serve ${appInfo.targetAudience}?`
+    ];
+
+    return [
+        ...baseQuestions,
+        ...featureQuestions,
+        ...techQuestions,
+        ...audienceQuestions
+    ].slice(0, 10); // Limit to 10 questions
+}
+
+/**
  * Function to call the Gemini API using the official SDK - FIXED VERSION
  */
 async function getGeminiAnswer(question: string): Promise<{ answer: string; sources: { uri: string; title: string }[] }> {
@@ -351,6 +394,53 @@ app.post('/api/generate-answers', async (req: Request, res: Response) => {
     }
 });
 
+// --- Endpoint 3: Generate Custom Answers Based on App Info ---
+app.post('/api/generate-custom-answers', async (req: Request, res: Response) => {
+    try {
+        const { appInfo } = req.body;
+        if (!appInfo) {
+            return res.status(400).json({ error: "Missing appInfo in request body." });
+        }
+
+        // Validate required fields
+        if (!appInfo.name || !appInfo.type || !appInfo.description || !appInfo.targetAudience) {
+            return res.status(400).json({ error: "Missing required app information fields." });
+        }
+
+        const customQuestions = generateCustomQuestions(appInfo);
+        
+        const answeredSite: SiteResult = {
+            siteUrl: appInfo.url || `Custom Analysis for ${appInfo.name}`,
+            questions: []
+        };
+        
+        console.log(`🚀 Processing ${customQuestions.length} custom questions for app: ${appInfo.name}`);
+
+        for (const [index, question] of customQuestions.entries()) {
+            console.log(`📝 Processing question ${index + 1}/${customQuestions.length}: ${question.substring(0, 50)}...`);
+            
+            const { answer, sources } = await getGeminiAnswer(question);
+            
+            answeredSite.questions.push({
+                id: index + 1,
+                question: question,
+                answer: answer,
+                sources: sources
+            });
+        }
+        
+        console.log(`🎉 Successfully processed all custom questions for ${appInfo.name}`);
+        res.status(200).json(answeredSite);
+
+    } catch (error) {
+        console.error("❌ Custom endpoint error:", error);
+        res.status(500).json({ 
+            error: "Failed to process custom questions and generate answers.", 
+            details: error instanceof Error ? error.message : "An unknown error occurred."
+        });
+    }
+});
+
 // --- Graceful Shutdown Handlers ---
 process.on('SIGTERM', () => {
     console.log('🛑 SIGTERM received, shutting down gracefully');
@@ -376,6 +466,7 @@ try {
         console.log("   GET  /api/health");
         console.log("   GET  /api/sites");
         console.log("   POST /api/generate-answers");
+        console.log("   POST /api/generate-custom-answers");
         console.log("\nPress Ctrl+C to stop the server\n");
     });
 } catch (error) {

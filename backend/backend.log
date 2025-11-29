@@ -1,0 +1,34 @@
+✅ Gemini SDK initialized successfully
+✅ Environment variables validated and Gemini SDK initialized
+
+
+✅ Backend running at http://localhost:3001
+📊 Health check available at: http://localhost:3001/api/health
+🌐 CORS enabled for: http://localhost:3000
+📁 Using data file: ./data/Directory_Bot.xlsx
+🤖 Using AI model: gemini-2.5-flash
+🛠️ Available endpoints:
+   GET  /api/health
+   GET  /api/sites
+   POST /api/generate-answers
+   POST /api/generate-custom-answers
+
+Press Ctrl+C to stop the server
+
+2025-11-29T14:32:30.942Z - GET /api/sites
+📖 Reading XLSX file: /workspace/project/directory_bot/backend/data/Directory_Bot.xlsx
+📊 Using sheet: data
+⚠️ Skipping row 7 due to error: Question cannot be empty
+⚠️ Skipping row 15 due to error: Question cannot be empty
+⚠️ Skipping row 24 due to error: Question cannot be empty
+✅ Successfully loaded 21 sites from XLSX file
+✅ Available sites fetched: 20
+2025-11-29T14:34:07.947Z - GET /api/sites
+🔄 Returning cached site data
+✅ Available sites fetched: 20
+2025-11-29T14:34:54.422Z - GET /api/sites
+🔄 Returning cached site data
+✅ Available sites fetched: 20
+2025-11-29T14:34:54.424Z - GET /api/sites
+🔄 Returning cached site data
+✅ Available sites fetched: 20

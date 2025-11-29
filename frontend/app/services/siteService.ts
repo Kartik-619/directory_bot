@@ -1,4 +1,5 @@
 import { Site } from '../types/site';  // Changed from '@/types/site'
+import { AppInfo } from '../types/onboarding';
 
 export class SiteService {
   private static readonly API_BASE_URL = 'http://localhost:3001/api';
@@ -19,6 +20,27 @@ export class SiteService {
     } catch (error) {
       console.error('Error fetching sites:', error);
       throw new Error('Failed to fetch sites. Make sure the backend is running.');
+    }
+  }
+
+  static async generateCustomAnswers(appInfo: AppInfo): Promise<any> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/generate-custom-answers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ appInfo }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error generating custom answers:', error);
+      throw new Error('Failed to generate custom answers. Make sure the backend is running.');
     }
   }
 
