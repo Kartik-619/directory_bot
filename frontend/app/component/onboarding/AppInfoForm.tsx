@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { gsap } from 'gsap';
 import { AppInfo } from '../../types/onboarding';
 import { FormProgress } from './FormProgress';
+import './AppInfoForm.css';
 
 interface AppInfoFormProps {
   onSubmit: (appInfo: AppInfo) => void;
@@ -35,6 +37,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     techStack: [],
   });
 
+  const formRef = useRef<HTMLDivElement>(null);
+  const stepContentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const steps = [
     { id: 1, title: 'Basic Info', description: 'Tell us about your app' },
     { id: 2, title: 'Description', description: 'Describe your app' },
@@ -42,13 +48,63 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     { id: 4, title: 'Review', description: 'Confirm your details' },
   ];
 
+  // GSAP Animations
+  useEffect(() => {
+    if (containerRef.current) {
+      gsap.fromTo(containerRef.current,
+        {
+          opacity: 0,
+          scale: 0.9,
+          y: 50
+        },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "back.out(1.7)"
+        }
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (stepContentRef.current) {
+      gsap.fromTo(stepContentRef.current,
+        {
+          opacity: 0,
+          x: currentStep > 1 ? 50 : -50
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 0.5,
+          ease: "power2.out"
+        }
+      );
+    }
+  }, [currentStep]);
+
   const updateFormData = (field: keyof AppInfo, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleNext = () => {
     if (currentStep < steps.length) {
-      setCurrentStep(currentStep + 1);
+      // Animate out current step
+      if (stepContentRef.current) {
+        gsap.to(stepContentRef.current, {
+          opacity: 0,
+          x: -50,
+          duration: 0.3,
+          ease: "power2.in",
+          onComplete: () => {
+            setCurrentStep(currentStep + 1);
+          }
+        });
+      } else {
+        setCurrentStep(currentStep + 1);
+      }
     } else {
       onSubmit(formData);
     }
@@ -56,7 +112,20 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      // Animate out current step
+      if (stepContentRef.current) {
+        gsap.to(stepContentRef.current, {
+          opacity: 0,
+          x: 50,
+          duration: 0.3,
+          ease: "power2.in",
+          onComplete: () => {
+            setCurrentStep(currentStep - 1);
+          }
+        });
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
     } else {
       onBack();
     }
@@ -68,57 +137,66 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       : [...array, item];
   };
 
+  const animateButtonClick = (element: HTMLElement) => {
+    gsap.fromTo(element,
+      {
+        scale: 1
+      },
+      {
+        scale: 0.95,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      }
+    );
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Website URL *
-              </label>
+          <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-form-group">
+              <label className="aif-label">Website URL *</label>
               <input
                 type="url"
                 value={formData.url}
                 onChange={(e) => updateFormData('url', e.target.value)}
                 placeholder="https://yourapp.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="aif-input"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                App Name *
-              </label>
+            <div className="aif-form-group">
+              <label className="aif-label">App Name *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => updateFormData('name', e.target.value)}
                 placeholder="My Awesome App"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="aif-input"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                App Type *
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="aif-form-group">
+              <label className="aif-label">App Type *</label>
+              <div className="aif-type-grid">
                 {appTypes.map((type) => (
                   <button
                     key={type.value}
                     type="button"
-                    onClick={() => updateFormData('type', type.value)}
-                    className={`p-4 border-2 rounded-xl text-left transition-all ${
-                      formData.type === type.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                    onClick={(e) => {
+                      updateFormData('type', type.value);
+                      animateButtonClick(e.currentTarget);
+                    }}
+                    className={`aif-type-btn ${
+                      formData.type === type.value ? 'aif-type-selected' : ''
                     }`}
                   >
-                    <div className="text-2xl mb-2">{type.icon}</div>
-                    <div className="font-medium text-gray-900">{type.label}</div>
+                    <div className="aif-type-icon">{type.icon}</div>
+                    <div className="aif-type-label">{type.label}</div>
                   </button>
                 ))}
               </div>
@@ -128,31 +206,27 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
       case 2:
         return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description *
-              </label>
+          <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-form-group">
+              <label className="aif-label">Description *</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => updateFormData('description', e.target.value)}
                 placeholder="Describe what your app does, its main purpose, and what problem it solves..."
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="aif-input aif-textarea"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Target Audience *
-              </label>
+            <div className="aif-form-group">
+              <label className="aif-label">Target Audience *</label>
               <input
                 type="text"
                 value={formData.targetAudience}
                 onChange={(e) => updateFormData('targetAudience', e.target.value)}
                 placeholder="e.g., Small business owners, developers, students..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="aif-input"
                 required
               />
             </div>
@@ -161,45 +235,42 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
       case 3:
         return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Main Features (Select all that apply)
-              </label>
-              <div className="space-y-2">
+          <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-form-group">
+              <label className="aif-label">Main Features (Select all that apply)</label>
+              <div className="aif-checkbox-group">
                 {[
                   'User Authentication', 'Payment Processing', 'Dashboard/Analytics',
                   'Mobile Responsive', 'Social Media Integration', 'API Integration',
                   'Real-time Features', 'Admin Panel', 'Multi-language Support',
                   'E-commerce Functionality', 'Blog/Content Management', 'Search Functionality'
                 ].map((feature) => (
-                  <label key={feature} className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                  <label key={feature} className="aif-checkbox-label">
                     <input
                       type="checkbox"
                       checked={formData.mainFeatures.includes(feature)}
                       onChange={() => updateFormData('mainFeatures', toggleArrayItem(formData.mainFeatures, feature))}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="aif-checkbox-input"
                     />
-                    <span className="text-gray-700">{feature}</span>
+                    <span>{feature}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Technology Stack (Select technologies you use)
-              </label>
-              <div className="flex flex-wrap gap-2">
+            <div className="aif-form-group">
+              <label className="aif-label">Technology Stack (Select technologies you use)</label>
+              <div className="aif-tech-grid">
                 {techOptions.map((tech) => (
                   <button
                     key={tech}
                     type="button"
-                    onClick={() => updateFormData('techStack', toggleArrayItem(formData.techStack, tech))}
-                    className={`px-4 py-2 rounded-full border transition-all ${
-                      formData.techStack.includes(tech)
-                        ? 'bg-blue-100 border-blue-500 text-blue-700'
-                        : 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-300'
+                    onClick={(e) => {
+                      updateFormData('techStack', toggleArrayItem(formData.techStack, tech));
+                      animateButtonClick(e.currentTarget);
+                    }}
+                    className={`aif-tech-btn ${
+                      formData.techStack.includes(tech) ? 'aif-tech-selected' : ''
                     }`}
                   >
                     {tech}
@@ -212,37 +283,37 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
       case 4:
         return (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="font-semibold text-blue-900 mb-4">Ready to analyze your app!</h3>
-              <p className="text-blue-700">
+          <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-review-alert">
+              <h3>Ready to analyze your app!</h3>
+              <p>
                 Based on your information, we'll provide personalized insights and recommendations 
                 from our database of successful websites.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-medium">URL:</span>
-                <span>{formData.url}</span>
+            <div className="aif-review-list">
+              <div className="aif-review-item">
+                <span className="aif-review-label">URL:</span>
+                <span className="aif-review-value">{formData.url}</span>
               </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-medium">Name:</span>
-                <span>{formData.name}</span>
+              <div className="aif-review-item">
+                <span className="aif-review-label">Name:</span>
+                <span className="aif-review-value">{formData.name}</span>
               </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-medium">Type:</span>
-                <span>{appTypes.find(t => t.value === formData.type)?.label}</span>
+              <div className="aif-review-item">
+                <span className="aif-review-label">Type:</span>
+                <span className="aif-review-value">{appTypes.find(t => t.value === formData.type)?.label}</span>
               </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-medium">Target Audience:</span>
-                <span>{formData.targetAudience}</span>
+              <div className="aif-review-item">
+                <span className="aif-review-label">Target Audience:</span>
+                <span className="aif-review-value">{formData.targetAudience}</span>
               </div>
-              <div className="py-3 border-b">
-                <span className="font-medium block mb-2">Main Features:</span>
-                <div className="flex flex-wrap gap-1">
+              <div className="aif-review-item">
+                <span className="aif-review-label">Main Features:</span>
+                <div className="aif-features-list">
                   {formData.mainFeatures.map(feature => (
-                    <span key={feature} className="px-2 py-1 bg-gray-100 rounded text-sm">
+                    <span key={feature} className="aif-feature-tag">
                       {feature}
                     </span>
                   ))}
@@ -264,7 +335,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       case 2:
         return formData.description && formData.targetAudience;
       case 3:
-        return true; // Features and tech are optional
+        return true;
       case 4:
         return true;
       default:
@@ -273,19 +344,19 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+    <div className="aif-wrapper">
+      <div className="aif-container" ref={containerRef}>
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+        <div className="aif-header">
           <button
             onClick={handleBack}
-            className="flex items-center space-x-2 text-white/80 hover:text-white mb-4"
+            className="aif-back-btn"
           >
             <span>←</span>
             <span>Back</span>
           </button>
-          <h1 className="text-2xl font-bold">Tell us about your app</h1>
-          <p className="text-blue-100 mt-1">
+          <h1 className="aif-title">Tell us about your app</h1>
+          <p className="aif-subtitle">
             Step {currentStep} of {steps.length}: {steps[currentStep - 1]?.description}
           </p>
         </div>
@@ -294,14 +365,14 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         <FormProgress steps={steps} currentStep={currentStep} />
 
         {/* Form Content */}
-        <div className="p-8">
+        <div className="aif-content" ref={formRef}>
           {renderStep()}
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between mt-8 pt-6 border-t">
+          <div className="aif-navigation">
             <button
               onClick={handleBack}
-              className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50"
+              className="aif-btn aif-btn-back"
             >
               {currentStep === 1 ? 'Back to Home' : 'Back'}
             </button>
@@ -309,7 +380,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
             <button
               onClick={handleNext}
               disabled={!isStepValid()}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all"
+              className="aif-btn aif-btn-next"
             >
               {currentStep === steps.length ? 'Get My Analysis →' : 'Continue →'}
             </button>
