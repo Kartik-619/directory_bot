@@ -6,6 +6,7 @@ import { Header } from './component/home/Header';
 import { SiteGrid } from './component/home/SiteGrid';
 import { LoadingState } from './component/home/LoadingState';
 import { ErrorState } from './component/home/ErrorState';
+import { ChatInterface } from './component/home/ChatInterface';
 
 export default function Home() {
   const { sites, loading, error, refetch } = useSites();
@@ -27,7 +28,10 @@ export default function Home() {
         <ErrorState message={error} onRetry={refetch} />
       )}
 
-      <SiteGrid ref={gridRef} sites={sites} />
+      <SiteGrid sites={sites} ref={gridRef} />
+
+      {/* Global Chat Interface */}
+      <ChatInterface />
     </div>
   );
 }
