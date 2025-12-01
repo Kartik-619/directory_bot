@@ -7,8 +7,18 @@ import { FormProgress } from './FormProgress';
 import './AppInfoForm.css';
 
 interface AppInfoFormProps {
-  onSubmit: (appInfo: AppInfo) => void;
+  onSubmit: (appInfo: AppInfo) => Promise<void>;
   onBack: () => void;
+}
+
+interface AnalysisResult {
+  siteUrl: string;
+  questions: {
+    id: number;
+    question: string;
+    answer: string;
+    sources: { uri: string; title: string }[];
+  }[];
 }
 
 const appTypes = [
@@ -27,6 +37,9 @@ const techOptions = [
 
 export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [formData, setFormData] = useState<AppInfo>({
     url: '',
     name: '',
@@ -40,6 +53,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const formRef = useRef<HTMLDivElement>(null);
   const stepContentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const steps = [
     { id: 1, title: 'Basic Info', description: 'Tell us about your app' },
@@ -85,13 +99,80 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   }, [currentStep]);
 
+  // Animate results when they appear
+  useEffect(() => {
+    if (analysisResult && resultsRef.current) {
+      gsap.fromTo(resultsRef.current,
+        {
+          opacity: 0,
+          y: 30
+        },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "power2.out",
+          stagger: 0.1
+        }
+      );
+    }
+  }, [analysisResult]);
+
   const updateFormData = (field: keyof AppInfo, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🚀 Submitting app info for analysis:', formData);
+      
+      const response = await fetch('http://localhost:3001/api/generate-custom-answers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ appInfo: formData }),
+      });
+
+      console.log('📡 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Analysis received:', result);
+      setAnalysisResult(result);
+      
+    } catch (err) {
+      console.error('❌ Analysis error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate analysis';
+      setError(errorMessage);
+      
+      // Show error animation
+      if (stepContentRef.current) {
+        gsap.fromTo(stepContentRef.current,
+          {
+            x: 0
+          },
+          {
+            x: [10, -10, 10, -10, 0],
+            duration: 0.4,
+            ease: "power2.out"
+          }
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleNext = () => {
     if (currentStep < steps.length) {
-      // Animate out current step
       if (stepContentRef.current) {
         gsap.to(stepContentRef.current, {
           opacity: 0,
@@ -106,13 +187,12 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         setCurrentStep(currentStep + 1);
       }
     } else {
-      onSubmit(formData);
+      handleSubmit();
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      // Animate out current step
       if (stepContentRef.current) {
         gsap.to(stepContentRef.current, {
           opacity: 0,
@@ -121,14 +201,31 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
           ease: "power2.in",
           onComplete: () => {
             setCurrentStep(currentStep - 1);
+            setError(null);
           }
         });
       } else {
         setCurrentStep(currentStep - 1);
+        setError(null);
       }
     } else {
       onBack();
     }
+  };
+
+  const handleNewAnalysis = () => {
+    setAnalysisResult(null);
+    setFormData({
+      url: '',
+      name: '',
+      type: 'webapp',
+      description: '',
+      targetAudience: '',
+      mainFeatures: [],
+      techStack: [],
+    });
+    setCurrentStep(1);
+    setError(null);
   };
 
   const toggleArrayItem = (array: string[], item: string): string[] => {
@@ -157,14 +254,13 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         return (
           <div className="aif-step-content" ref={stepContentRef}>
             <div className="aif-form-group">
-              <label className="aif-label">Website URL *</label>
+              <label className="aif-label">Website URL</label>
               <input
                 type="url"
                 value={formData.url}
                 onChange={(e) => updateFormData('url', e.target.value)}
                 placeholder="https://yourapp.com"
                 className="aif-input"
-                required
               />
             </div>
 
@@ -295,7 +391,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
             <div className="aif-review-list">
               <div className="aif-review-item">
                 <span className="aif-review-label">URL:</span>
-                <span className="aif-review-value">{formData.url}</span>
+                <span className="aif-review-value">{formData.url || 'Not provided'}</span>
               </div>
               <div className="aif-review-item">
                 <span className="aif-review-label">Name:</span>
@@ -312,11 +408,15 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               <div className="aif-review-item">
                 <span className="aif-review-label">Main Features:</span>
                 <div className="aif-features-list">
-                  {formData.mainFeatures.map(feature => (
-                    <span key={feature} className="aif-feature-tag">
-                      {feature}
-                    </span>
-                  ))}
+                  {formData.mainFeatures.length > 0 ? (
+                    formData.mainFeatures.map(feature => (
+                      <span key={feature} className="aif-feature-tag">
+                        {feature}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="aif-no-features">No features selected</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -328,12 +428,58 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   };
 
+  const renderResults = () => {
+    if (!analysisResult) return null;
+
+    return (
+      <div className="aif-results" ref={resultsRef}>
+        <div className="aif-results-header">
+          <h2>🎉 Your Analysis is Ready!</h2>
+          <p>Personalized insights for <strong>{formData.name}</strong></p>
+        </div>
+
+        <div className="aif-analysis-questions">
+          {analysisResult.questions.map((item, index) => (
+            <div key={item.id} className="aif-analysis-item">
+              <div className="aif-question-card">
+                <h3>Q{index + 1}: {item.question}</h3>
+                <div className="aif-answer">
+                  <p>{item.answer}</p>
+                </div>
+                {item.sources && item.sources.length > 0 && (
+                  <div className="aif-sources">
+                    <strong>Sources:</strong>
+                    <div className="aif-sources-list">
+                      {item.sources.map((source, idx) => (
+                        <a key={idx} href={source.uri} target="_blank" rel="noopener noreferrer" className="aif-source-link">
+                          {source.title || source.uri}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="aif-results-actions">
+          <button onClick={handleNewAnalysis} className="aif-btn aif-btn-primary">
+            🔄 Analyze Another App
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const isStepValid = () => {
+    if (isLoading) return false;
+    
     switch (currentStep) {
       case 1:
-        return formData.url && formData.name;
+        return formData.name.trim().length > 0;
       case 2:
-        return formData.description && formData.targetAudience;
+        return formData.description.trim().length > 0 && formData.targetAudience.trim().length > 0;
       case 3:
         return true;
       case 4:
@@ -343,6 +489,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   };
 
+  if (analysisResult) {
+    return renderResults();
+  }
+
   return (
     <div className="aif-wrapper">
       <div className="aif-container" ref={containerRef}>
@@ -351,6 +501,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
           <button
             onClick={handleBack}
             className="aif-back-btn"
+            disabled={isLoading}
           >
             <span>←</span>
             <span>Back</span>
@@ -366,6 +517,13 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
         {/* Form Content */}
         <div className="aif-content" ref={formRef}>
+          {error && (
+            <div className="aif-error-message">
+              <span>⚠️ {error}</span>
+              <button onClick={() => setError(null)} className="aif-error-close">×</button>
+            </div>
+          )}
+
           {renderStep()}
 
           {/* Navigation Buttons */}
@@ -373,6 +531,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
             <button
               onClick={handleBack}
               className="aif-btn aif-btn-back"
+              disabled={isLoading}
             >
               {currentStep === 1 ? 'Back to Home' : 'Back'}
             </button>
@@ -382,7 +541,16 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               disabled={!isStepValid()}
               className="aif-btn aif-btn-next"
             >
-              {currentStep === steps.length ? 'Get My Analysis →' : 'Continue →'}
+              {isLoading ? (
+                <>
+                  <div className="aif-spinner"></div>
+                  Analyzing...
+                </>
+              ) : currentStep === steps.length ? (
+                'Get My Analysis →'
+              ) : (
+                'Continue →'
+              )}
             </button>
           </div>
         </div>
