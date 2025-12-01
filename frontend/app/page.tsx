@@ -1,38 +1,23 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useOnboarding } from './context/OnboardingContext';
-import { useSites } from './hooks/useSites';
-import { usePageAnimation } from './hooks/useAnimation';
-import { Header } from './component/home/Header';
-import { SiteGrid } from './component/home/SiteGrid';
-import { LoadingState } from './component/home/LoadingState';
-import { ErrorState } from './component/home/ErrorState';
 import { HeroSection } from './component/onboarding/HeroSection';
 import { AppInfoForm } from './component/onboarding/AppInfoForm';
 import { AppInfo } from './types/onboarding';
-import { Site } from './types/site';
 
 export default function Home() {
+  const router = useRouter();
   const { isOnboardingComplete, appInfo, completeOnboarding, resetOnboarding } = useOnboarding();
   const [showForm, setShowForm] = useState(false);
-  const [customSites, setCustomSites] = useState<Site[]>([]);
-  const { sites, loading, error, refetch } = useSites();
-  const { headerRef, gridRef } = usePageAnimation(customSites.length > 0 ? customSites : sites, loading);
 
-  // Create custom analysis based on app info - no hardcoded sites
+  // Redirect to dashboard if onboarding is complete
   useEffect(() => {
     if (isOnboardingComplete && appInfo) {
-      // Only create a single custom analysis site based on user's app
-      const userAppSite: Site = {
-        url: appInfo.url || `custom-analysis-${appInfo.name.toLowerCase().replace(/\s+/g, '-')}`,
-        name: `${appInfo.name} - AI Analysis`
-      };
-
-      // Set only the user's custom analysis, no hardcoded external sites
-      setCustomSites([userAppSite]);
+      router.push('/dashboard');
     }
-  }, [isOnboardingComplete, appInfo]);
+  }, [isOnboardingComplete, appInfo, router]);
 
   const handleGetStarted = () => {
     setShowForm(true);
@@ -41,14 +26,10 @@ export default function Home() {
   const handleFormSubmit = (formData: AppInfo) => {
     completeOnboarding(formData);
     setShowForm(false);
+    // Redirect will happen automatically via useEffect
   };
 
   const handleBackToHero = () => {
-    setShowForm(false);
-  };
-
-  const handleResetOnboarding = () => {
-    resetOnboarding();
     setShowForm(false);
   };
 
@@ -66,34 +47,13 @@ export default function Home() {
     return <HeroSection onGetStarted={handleGetStarted} />;
   }
 
-  // Show main directory interface after onboarding
-  if (loading) {
-    return <LoadingState />;
-  }
-
+  // Show loading while redirecting to dashboard
   return (
-    <div className="container">
-      <Header
-        ref={headerRef}
-        title={`Directory Bot - ${appInfo?.name || 'Your App'}`}
-        subtitle={`AI-powered insights for ${appInfo?.type || 'your'} application. Get personalized recommendations based on your app profile!`}
-      />
-
-      {/* Add reset button for testing */}
-      <div className="mb-4 text-center">
-        <button
-          onClick={handleResetOnboarding}
-          className="text-sm text-gray-500 hover:text-gray-700 underline"
-        >
-          Reset Onboarding (for testing)
-        </button>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="loading-spinner"></div>
+        <p className="text-gray-600 mt-4">Redirecting to your dashboard...</p>
       </div>
-
-      {error && (
-        <ErrorState message={error} onRetry={refetch} />
-      )}
-
-      <SiteGrid ref={gridRef} sites={customSites.length > 0 ? customSites : sites} />
     </div>
   );
 }

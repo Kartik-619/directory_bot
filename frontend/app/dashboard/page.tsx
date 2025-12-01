@@ -204,12 +204,24 @@ export default function Dashboard() {
               </h1>
               <p className="text-gray-600">Personalized insights based on your app</p>
             </div>
-            <button
-              onClick={() => router.push('/')}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-            >
-              ← Back to Home
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('appInfo');
+                  localStorage.removeItem('onboardingComplete');
+                  router.push('/');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                🔄 New Analysis
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                ← Back to Home
+              </button>
+            </div>
           </div>
         </div>
       </header>
