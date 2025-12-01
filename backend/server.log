@@ -1,0 +1,42 @@
+⚠️  GEMINI_API_KEY not set or using placeholder - AI features will be disabled
+✅ Environment variables validated
+
+
+✅ Backend running at http://localhost:3003
+📊 Health check available at: http://localhost:3003/api/health
+🌐 CORS enabled for: http://localhost:3000, http://localhost:12000, and external runtime URLs
+📁 Using data file: ./data/Directory_Bot.xlsx
+🤖 Using AI model: gemini-2.5-flash
+🛠️ Available endpoints:
+   GET  /api/health
+   GET  /api/sites
+   POST /api/generate-answers
+   POST /api/generate-custom-answers
+
+Press Ctrl+C to stop the server
+
+2025-12-01T17:36:23.660Z - GET /api/health
+2025-12-01T17:36:27.094Z - GET /api/sites
+📖 Reading XLSX file: /workspace/project/directory_bot/backend/data/Directory_Bot.xlsx
+📊 Using sheet: data
+⚠️ Skipping row 7 due to error: Question cannot be empty
+⚠️ Skipping row 15 due to error: Question cannot be empty
+⚠️ Skipping row 24 due to error: Question cannot be empty
+✅ Successfully loaded 21 sites from XLSX file
+✅ Available sites fetched: 20
+2025-12-01T17:36:36.556Z - GET /api/sites
+🔄 Returning cached site data
+✅ Available sites fetched: 20
+2025-12-01T17:38:15.725Z - POST /api/generate-custom-answers
+🚀 Processing 10 custom questions for app: Test SaaS App
+📝 Processing question 1/10: What are the best practices for saas applications ...
+📝 Processing question 2/10: How can Test SaaS App improve user engagement for ...
+📝 Processing question 3/10: What are the key success metrics for saas applicat...
+📝 Processing question 4/10: How can Test SaaS App optimize conversion rates?...
+📝 Processing question 5/10: What are the latest trends in saas development?...
+📝 Processing question 6/10: How can Test SaaS App optimize user authentication...
+📝 Processing question 7/10: How can Test SaaS App optimize dashboard/analytics...
+📝 Processing question 8/10: How can Test SaaS App optimize mobile responsive f...
+📝 Processing question 9/10: What are the best practices for React in saas appl...
+📝 Processing question 10/10: What are the best practices for Next.js in saas ap...
+🎉 Successfully processed all custom questions for Test SaaS App

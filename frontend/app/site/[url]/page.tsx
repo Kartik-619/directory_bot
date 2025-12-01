@@ -46,7 +46,7 @@ export default function SitePage() {
         data = await SiteService.generateCustomAnswers(appInfo);
       } else {
         // Use regular site analysis endpoint
-        const response = await fetch('http://localhost:3001/api/generate-answers', {
+        const response = await fetch('http://localhost:3003/api/generate-answers', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
