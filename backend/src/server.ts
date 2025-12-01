@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 
-const PORT = 3003;
+const PORT = 3004;
 
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
