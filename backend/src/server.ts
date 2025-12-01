@@ -10,7 +10,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 dotenv.config();
 
 const app = express();
-const PORT = 3002;
+
+const PORT = 3003;
+
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
@@ -27,7 +30,7 @@ let lastModified: number = 0;
 
 // --- Setup Middlewares ---
 app.use(cors({
-    origin: 'http://localhost:3000'
+    origin: ['http://localhost:3000', 'http://localhost:12000', 'https://work-1-qisfyhentxwgdxaf.prod-runtime.all-hands.dev', 'https://work-2-qisfyhentxwgdxaf.prod-runtime.all-hands.dev']
 }));
 app.use(express.json());
 
@@ -64,21 +67,15 @@ interface AppInfo {
  * Validate all required environment variables and initialize the AI SDK
  */
 function validateEnvironment(): void {
-    const required = ['GEMINI_API_KEY'];
-    const missing = required.filter(key => !process.env[key]);
-
-    if (missing.length > 0) {
-        throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-    }
-
-    if (GEMINI_API_KEY) {
+    if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here') {
         genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
         console.log('✅ Gemini SDK initialized successfully');
     } else {
-        throw new Error("GEMINI_API_KEY is not set.");
+        console.log('⚠️  GEMINI_API_KEY not set or using placeholder - AI features will be disabled');
+        genAI = null;
     }
 
-    console.log('✅ Environment variables validated and Gemini SDK initialized');
+    console.log('✅ Environment variables validated');
 }
 
 /**
@@ -249,8 +246,12 @@ function generateCustomQuestions(appInfo: AppInfo): string[] {
  * Function to call the Gemini API using the official SDK - FIXED VERSION
  */
 async function getGeminiAnswer(question: string): Promise<{ answer: string; sources: { uri: string; title: string }[] }> {
-    if (!GEMINI_API_KEY || !genAI) {
-        throw new Error("Gemini AI is not properly initialized.");
+    if (!genAI) {
+        // Return a mock response when AI is not available
+        return {
+            answer: "AI service is currently unavailable. Please configure GEMINI_API_KEY to enable AI-powered responses.",
+            sources: []
+        };
     }
 
     if (!checkRateLimit(question)) {
@@ -456,10 +457,10 @@ process.on('SIGINT', () => {
 try {
     validateEnvironment();
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`\n\n✅ Backend running at http://localhost:${PORT}`);
-        console.log("📊 Health check available at: http://localhost:3001/api/health");
-        console.log("🌐 CORS enabled for: http://localhost:3000");
+        console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
+        console.log("🌐 CORS enabled for: http://localhost:3000, http://localhost:12000, and external runtime URLs");
         console.log(`📁 Using data file: ${DATA_FILE_PATH}`);
         console.log(`🤖 Using AI model: ${MODEL_NAME}`);
         console.log("🛠️ Available endpoints:");

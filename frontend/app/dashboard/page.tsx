@@ -51,14 +51,34 @@ export default function Dashboard() {
         setMessages(prev => [...prev, newMessage]);
         setInput('');
         
-        // Simulate AI response
-        setTimeout(() => {
-          const aiResponse = {
-            id: (Date.now() + 1).toString(),
-            text: `Thanks for your message! I can help you with ${appInfo?.name || 'your app'}.`,
-            isUser: false
-          };
-          setMessages(prev => [...prev, aiResponse]);
+        // Generate AI response using the custom analysis
+        setTimeout(async () => {
+          try {
+            // For now, provide a contextual response based on the app info
+            let responseText = `Thanks for your question about ${appInfo?.name || 'your app'}! `;
+            
+            if (appInfo) {
+              responseText += `As a ${appInfo.type} application targeting ${appInfo.targetAudience}, `;
+              responseText += `I can help you with insights about ${appInfo.mainFeatures.slice(0, 2).join(' and ')}. `;
+              responseText += `For detailed AI-powered analysis, please use the "Generate AI Analysis" button above.`;
+            } else {
+              responseText += `I can provide insights about your application. Please complete the onboarding process for personalized recommendations.`;
+            }
+            
+            const aiResponse = {
+              id: (Date.now() + 1).toString(),
+              text: responseText,
+              isUser: false
+            };
+            setMessages(prev => [...prev, aiResponse]);
+          } catch (error) {
+            const errorResponse = {
+              id: (Date.now() + 1).toString(),
+              text: "I'm sorry, I encountered an error. Please try using the AI Analysis feature for detailed insights.",
+              isUser: false
+            };
+            setMessages(prev => [...prev, errorResponse]);
+          }
         }, 1000);
       }
     };
@@ -225,29 +245,41 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Sites Section */}
+        {/* Custom Analysis Section */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Directory Insights
+            AI-Powered Analysis
           </h2>
           <p className="text-gray-600 mb-6">
-            Based on your {appInfo.type} app, here are insights from successful websites.
+            Get personalized insights and recommendations for {appInfo.name} based on your app profile.
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  Example Site {i}
-                </h3>
-                <p className="text-gray-600 text-sm mb-4">
-                  This is an example site card. Real sites will appear here when connected to your backend.
-                </p>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-                  View Insights
-                </button>
+          <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">🤖</span>
               </div>
-            ))}
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Custom Analysis for {appInfo.name}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Generate AI-powered insights tailored to your {appInfo.type} application, 
+                target audience ({appInfo.targetAudience}), and specific features.
+              </p>
+              <div className="text-sm text-gray-500 mb-6">
+                <p><strong>Features:</strong> {appInfo.mainFeatures.join(', ')}</p>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => {
+                const customUrl = appInfo.url || `custom-analysis-${appInfo.name.toLowerCase().replace(/\s+/g, '-')}`;
+                router.push(`/site/${encodeURIComponent(customUrl)}`);
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg text-lg hover:bg-blue-700 transition-colors"
+            >
+              Generate AI Analysis
+            </button>
           </div>
         </div>
       </div>

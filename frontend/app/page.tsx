@@ -20,37 +20,19 @@ export default function Home() {
   const { sites, loading, error, refetch } = useSites();
   const { headerRef, gridRef } = usePageAnimation(customSites.length > 0 ? customSites : sites, loading);
 
-  // Create custom sites based on app info
+  // Create custom analysis based on app info - no hardcoded sites
   useEffect(() => {
     if (isOnboardingComplete && appInfo) {
+      // Only create a single custom analysis site based on user's app
       const userAppSite: Site = {
         url: appInfo.url || `custom-analysis-${appInfo.name.toLowerCase().replace(/\s+/g, '-')}`,
-        name: `${appInfo.name} - Custom Analysis`
+        name: `${appInfo.name} - AI Analysis`
       };
 
-      // Add some related sites based on app type
-      const relatedSites: Site[] = [];
-      
-      if (appInfo.type === 'saas') {
-        relatedSites.push(
-          { url: 'https://stripe.com', name: 'Stripe - Payment Processing' },
-          { url: 'https://slack.com', name: 'Slack - Team Communication' }
-        );
-      } else if (appInfo.type === 'ecommerce') {
-        relatedSites.push(
-          { url: 'https://shopify.com', name: 'Shopify - E-commerce Platform' },
-          { url: 'https://amazon.com', name: 'Amazon - Marketplace' }
-        );
-      } else if (appInfo.type === 'blog') {
-        relatedSites.push(
-          { url: 'https://medium.com', name: 'Medium - Publishing Platform' },
-          { url: 'https://wordpress.com', name: 'WordPress - CMS' }
-        );
-      }
-
-      setCustomSites([userAppSite, ...relatedSites, ...sites.slice(0, 3)]);
+      // Set only the user's custom analysis, no hardcoded external sites
+      setCustomSites([userAppSite]);
     }
-  }, [isOnboardingComplete, appInfo, sites]);
+  }, [isOnboardingComplete, appInfo]);
 
   const handleGetStarted = () => {
     setShowForm(true);

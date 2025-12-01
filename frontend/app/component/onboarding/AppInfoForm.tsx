@@ -209,7 +209,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     try {
       console.log('🚀 Submitting app info for analysis:', formData);
       
-      const response = await fetch('http://localhost:3001/api/generate-custom-answers', {
+      const response = await fetch('http://localhost:3003/api/generate-custom-answers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
