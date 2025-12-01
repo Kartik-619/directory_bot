@@ -10,7 +10,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 dotenv.config();
 
 const app = express();
+
 const PORT = 3003;
+
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
