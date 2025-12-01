@@ -54,6 +54,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const stepContentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const analysisStorageKey = 'app_analysis_results';
 
   const steps = [
     { id: 1, title: 'Basic Info', description: 'Tell us about your app' },
@@ -118,6 +119,85 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   }, [analysisResult]);
 
+  // Save analysis to localStorage when received
+  useEffect(() => {
+    if (analysisResult) {
+      saveAnalysisToStorage(analysisResult);
+    }
+  }, [analysisResult]);
+
+  // Load saved analysis on component mount
+  useEffect(() => {
+    const savedAnalysis = loadAnalysisFromStorage();
+    if (savedAnalysis) {
+      setAnalysisResult(savedAnalysis);
+    }
+  }, []);
+
+  const saveAnalysisToStorage = (result: AnalysisResult) => {
+    try {
+      const timestamp = new Date().toISOString();
+      const analysisWithMetadata = {
+        ...result,
+        timestamp,
+        appName: formData.name,
+        appType: formData.type
+      };
+      
+      // Get existing results
+      const existingResults = JSON.parse(localStorage.getItem(analysisStorageKey) || '[]');
+      
+      // Add new result (keep last 5 analyses)
+      const updatedResults = [analysisWithMetadata, ...existingResults.slice(0, 4)];
+      
+      localStorage.setItem(analysisStorageKey, JSON.stringify(updatedResults));
+      console.log('✅ Analysis saved to localStorage');
+    } catch (error) {
+      console.error('❌ Error saving analysis:', error);
+    }
+  };
+
+  const loadAnalysisFromStorage = (): AnalysisResult | null => {
+    try {
+      const savedResults = JSON.parse(localStorage.getItem(analysisStorageKey) || '[]');
+      if (savedResults.length > 0) {
+        // Return the most recent analysis
+        const latest = savedResults[0];
+        // Remove metadata before returning
+        const { timestamp, appName, appType, ...analysisResult } = latest;
+        return analysisResult as AnalysisResult;
+      }
+    } catch (error) {
+      console.error('❌ Error loading analysis:', error);
+    }
+    return null;
+  };
+
+  const saveResultToBackend = async (result: AnalysisResult): Promise<void> => {
+    try {
+      const response = await fetch('http://localhost:3001/api/save-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysis: result,
+          appInfo: formData,
+          timestamp: new Date().toISOString()
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save analysis to backend');
+      }
+
+      console.log('✅ Analysis saved to backend');
+    } catch (error) {
+      console.error('❌ Error saving to backend:', error);
+      // Don't throw error - this is just for temporary storage
+    }
+  };
+
   const updateFormData = (field: keyof AppInfo, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -146,7 +226,18 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
       const result = await response.json();
       console.log('✅ Analysis received:', result);
+      
+      // Set result for display
       setAnalysisResult(result);
+      
+      // Save to localStorage
+      saveAnalysisToStorage(result);
+      
+      // Also save to backend if needed (temporary storage)
+      await saveResultToBackend(result);
+      
+      // Call parent onSubmit with form data
+      await onSubmit(formData);
       
     } catch (err) {
       console.error('❌ Analysis error:', err);
@@ -154,18 +245,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       setError(errorMessage);
       
       // Show error animation
-      if (stepContentRef.current) {
-        gsap.fromTo(stepContentRef.current,
-          {
-            x: 0
-          },
-          {
-            x: [10, -10, 10, -10, 0],
-            duration: 0.4,
-            ease: "power2.out"
-          }
-        );
-      }
+     
     } finally {
       setIsLoading(false);
     }
@@ -262,6 +342,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                 placeholder="https://yourapp.com"
                 className="aif-input"
               />
+              {formData.url && !formData.url.startsWith('http') && (
+                <div className="aif-validation-hint">
+                  Please include http:// or https://
+                </div>
+              )}
             </div>
 
             <div className="aif-form-group">
@@ -274,6 +359,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                 className="aif-input"
                 required
               />
+              {formData.name && formData.name.length < 3 && (
+                <div className="aif-validation-error">
+                  Name must be at least 3 characters
+                </div>
+              )}
             </div>
 
             <div className="aif-form-group">
@@ -313,6 +403,14 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                 className="aif-input aif-textarea"
                 required
               />
+              <div className="aif-char-counter">
+                {formData.description.length}/500 characters
+              </div>
+              {formData.description && formData.description.length < 50 && (
+                <div className="aif-validation-hint">
+                  Please provide more details (at least 50 characters)
+                </div>
+              )}
             </div>
 
             <div className="aif-form-group">
@@ -325,6 +423,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                 className="aif-input"
                 required
               />
+              {formData.targetAudience && formData.targetAudience.length < 10 && (
+                <div className="aif-validation-hint">
+                  Be more specific about your target audience
+                </div>
+              )}
             </div>
           </div>
         );
@@ -352,6 +455,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                   </label>
                 ))}
               </div>
+              {formData.mainFeatures.length === 0 && (
+                <div className="aif-validation-hint">
+                  Select at least one main feature
+                </div>
+              )}
             </div>
 
             <div className="aif-form-group">
@@ -372,6 +480,9 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                     {tech}
                   </button>
                 ))}
+              </div>
+              <div className="aif-selection-count">
+                Selected: {formData.techStack.length} technologies
               </div>
             </div>
           </div>
@@ -436,6 +547,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         <div className="aif-results-header">
           <h2>🎉 Your Analysis is Ready!</h2>
           <p>Personalized insights for <strong>{formData.name}</strong></p>
+          <div className="aif-results-meta">
+            <span className="aif-timestamp">
+              Generated: {new Date().toLocaleString()}
+            </span>
+          </div>
         </div>
 
         <div className="aif-analysis-questions">
@@ -467,6 +583,9 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
           <button onClick={handleNewAnalysis} className="aif-btn aif-btn-primary">
             🔄 Analyze Another App
           </button>
+          <div className="aif-storage-note">
+            <small>Analysis saved automatically. You can view previous analyses anytime.</small>
+          </div>
         </div>
       </div>
     );
@@ -477,9 +596,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     
     switch (currentStep) {
       case 1:
-        return formData.name.trim().length > 0;
+        return formData.name.trim().length >= 3;
       case 2:
-        return formData.description.trim().length > 0 && formData.targetAudience.trim().length > 0;
+        return formData.description.trim().length >= 50 && 
+               formData.targetAudience.trim().length >= 10;
       case 3:
         return true;
       case 4:
