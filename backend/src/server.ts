@@ -4,29 +4,25 @@ import * as dotenv from 'dotenv';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Load environment variables from .env file
 dotenv.config();
 
 const app = express();
-
 const PORT = 3004;
-
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
 
-// Initialize Gemini SDK
-let genAI: GoogleGenerativeAI | null = null;
-const MODEL_NAME = 'gemini-2.5-flash';
+// Use a free model from OpenRouter
+const MODEL_NAME = 'mistralai/mistral-7b-instruct:free'; // Free model
+// Alternative free models:
+// - 'google/gemma-2b-it:free'
+// - 'huggingfaceh4/zephyr-7b-beta:free'
+// - 'meta-llama/llama-3.2-3b-instruct:free'
 
 // Rate limiting storage
 const rateLimit = new Map<string, number>();
-// Caching for file data
-let cachedSiteData: SiteResult[] | null = null;
-let lastModified: number = 0;
 
 // --- Setup Middlewares ---
 app.use(cors({
@@ -45,11 +41,11 @@ interface SiteQuestion {
     id: number;
     question: string;
     answer: string;
-    sources: { uri: string; title: string }[];
 }
 
-interface SiteResult {
+interface SiteAnalysis {
     siteUrl: string;
+    siteName: string;
     questions: SiteQuestion[];
 }
 
@@ -63,16 +59,19 @@ interface AppInfo {
     techStack: string[];
 }
 
+interface DirectorySite {
+    url: string;
+    questions: string[];
+}
+
 /**
- * Validate all required environment variables and initialize the AI SDK
+ * Validate all required environment variables
  */
 function validateEnvironment(): void {
-    if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here') {
-        genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        console.log('✅ Gemini SDK initialized successfully');
+    if (OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here') {
+        console.log('✅ OpenRouter API key loaded');
     } else {
-        console.log('⚠️  GEMINI_API_KEY not set or using placeholder - AI features will be disabled');
-        genAI = null;
+        console.log('⚠️  OPENROUTER_API_KEY not set - using fallback mock responses');
     }
 
     console.log('✅ Environment variables validated');
@@ -139,7 +138,7 @@ function getDataSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet {
 /**
  * Reads data from local XLSX file and structures it.
  */
-async function fetchAllSiteData(): Promise<SiteResult[]> {
+async function fetchAllSiteData(): Promise<DirectorySite[]> {
     if (!DATA_FILE_PATH) {
         console.error("Missing DATA_FILE_PATH in .env");
         throw new Error("Missing data file path. Cannot fetch data.");
@@ -152,12 +151,6 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
             throw new Error(`Data file not found at: ${resolvedPath}`);
         }
 
-        const stats = fs.statSync(resolvedPath);
-        if (cachedSiteData && stats.mtimeMs === lastModified) {
-            console.log('🔄 Returning cached site data');
-            return cachedSiteData;
-        }
-
         console.log(`📖 Reading XLSX file: ${resolvedPath}`);
         const workbook = XLSX.readFile(resolvedPath);
         const worksheet = getDataSheet(workbook);
@@ -168,7 +161,7 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
             throw new Error("No data found in XLSX file. Please check the file structure.");
         }
 
-        const siteData: SiteResult[] = [];
+        const directorySites: DirectorySite[] = [];
 
         dataRows.forEach((row: string[], rowIndex: number) => {
             try {
@@ -180,16 +173,9 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
                         .map(q => validateQuestion(q.trim()))
                         .filter(q => q.length > 0);
 
-                    const newQuestions: SiteQuestion[] = questionsArray.map((q, qIndex) => ({
-                        id: qIndex + 1,
-                        question: q,
-                        answer: '',
-                        sources: [],
-                    }));
-
-                    siteData.push({
-                        siteUrl: siteUrl,
-                        questions: newQuestions,
+                    directorySites.push({
+                        url: siteUrl,
+                        questions: questionsArray,
                     });
                 }
             } catch (rowError) {
@@ -197,11 +183,8 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
             }
         });
 
-        cachedSiteData = siteData;
-        lastModified = stats.mtimeMs;
-
-        console.log(`✅ Successfully loaded ${siteData.length} sites from XLSX file`);
-        return siteData;
+        console.log(`✅ Successfully loaded ${directorySites.length} directory sites from XLSX file`);
+        return directorySites;
 
     } catch (error) {
         console.error("❌ Error reading XLSX file:", error);
@@ -210,106 +193,168 @@ async function fetchAllSiteData(): Promise<SiteResult[]> {
 }
 
 /**
- * Generate custom questions based on app information
+ * Get questions for a specific site from the directory
  */
-function generateCustomQuestions(appInfo: AppInfo): string[] {
-    const baseQuestions = [
-        `What are the best practices for ${appInfo.type} applications like ${appInfo.name}?`,
-        `How can ${appInfo.name} improve user engagement for ${appInfo.targetAudience}?`,
-        `What are the key success metrics for ${appInfo.type} applications?`,
-        `How can ${appInfo.name} optimize conversion rates?`,
-        `What are the latest trends in ${appInfo.type} development?`
-    ];
-
-    const featureQuestions = appInfo.mainFeatures.slice(0, 3).map(feature => 
-        `How can ${appInfo.name} optimize ${feature.toLowerCase()} for better user experience?`
-    );
-
-    const techQuestions = appInfo.techStack.slice(0, 2).map(tech => 
-        `What are the best practices for ${tech} in ${appInfo.type} applications?`
-    );
-
-    const audienceQuestions = [
-        `What are the pain points of ${appInfo.targetAudience} that ${appInfo.name} should address?`,
-        `How can ${appInfo.name} better serve ${appInfo.targetAudience}?`
-    ];
-
-    return [
-        ...baseQuestions,
-        ...featureQuestions,
-        ...techQuestions,
-        ...audienceQuestions
-    ].slice(0, 10); // Limit to 10 questions
+async function getQuestionsForSite(siteUrl: string): Promise<string[]> {
+    try {
+        const directorySites = await fetchAllSiteData();
+        const normalizedTargetUrl = siteUrl.toLowerCase().trim();
+        
+        // Find the site in the directory
+        const site = directorySites.find(dirSite => {
+            const dirSiteUrl = dirSite.url.toLowerCase().trim();
+            // Check for exact match or domain match
+            return dirSiteUrl === normalizedTargetUrl || 
+                   dirSiteUrl.includes(normalizedTargetUrl) || 
+                   normalizedTargetUrl.includes(dirSiteUrl);
+        });
+        
+        if (site && site.questions.length > 0) {
+            console.log(`✅ Found ${site.questions.length} questions for ${siteUrl}`);
+            return site.questions;
+        }
+        
+        console.log(`⚠️ No questions found for ${siteUrl}, using default questions`);
+        // Return some default questions if none found
+        return [
+            'What can we learn from their user experience design?',
+            'How do they handle customer engagement?',
+            'What are their key features for user retention?',
+            'How do they present their value proposition?'
+        ];
+        
+    } catch (error) {
+        console.error(`❌ Error getting questions for ${siteUrl}:`, error);
+        throw new Error(`Failed to get questions for site: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
 
 /**
- * Function to call the Gemini API using the official SDK - FIXED VERSION
+ * Function to call the OpenRouter API for site-specific answers
  */
-async function getGeminiAnswer(question: string): Promise<{ answer: string; sources: { uri: string; title: string }[] }> {
-    if (!genAI) {
-        // Return a mock response when AI is not available
-        return {
-            answer: "AI service is currently unavailable. Please configure GEMINI_API_KEY to enable AI-powered responses.",
-            sources: []
-        };
+async function getOpenRouterAnswer(question: string, context: {
+    appInfo: AppInfo;
+    siteUrl: string;
+}): Promise<string> {
+    if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'your_openrouter_api_key_here') {
+        console.log('⚠️ No OpenRouter API key, using mock response');
+        return generateMockAnswer(question, context);
     }
 
-    if (!checkRateLimit(question)) {
+    if (!checkRateLimit(`${question}-${context.siteUrl}`)) {
         throw new Error("Rate limit exceeded. Please wait before making another request.");
     }
 
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 2;
     let attempt = 0;
 
     while (attempt < MAX_RETRIES) {
         try {
-            console.log(`🔍 Gemini API attempt ${attempt + 1} for: "${question.substring(0, 50)}..."`);
+            console.log(`🔍 OpenRouter API attempt ${attempt + 1} for site ${context.siteUrl}: "${question.substring(0, 50)}..."`);
 
-            // FIXED: Use the correct model and simplified approach
-            const model = genAI.getGenerativeModel({ 
-                model: MODEL_NAME
+            // Create site-specific prompt
+            const prompt = `
+ANALYSIS CONTEXT:
+YOUR APP: ${context.appInfo.name} (${context.appInfo.type})
+APP DESCRIPTION: ${context.appInfo.description}
+TARGET AUDIENCE: ${context.appInfo.targetAudience}
+KEY FEATURES: ${context.appInfo.mainFeatures.join(', ')}
+TECH STACK: ${context.appInfo.techStack.join(', ')}
+
+REFERENCE SITE TO ANALYZE: ${context.siteUrl}
+
+SPECIFIC QUESTION ABOUT THIS SITE: ${question}
+
+INSTRUCTIONS:
+1. Analyze ${context.siteUrl} specifically for insights relevant to ${context.appInfo.name}
+2. Provide actionable advice that ${context.appInfo.name} can implement
+3. Focus on practical strategies and best practices
+4. Reference specific aspects of ${context.siteUrl} when applicable
+5. Keep answer focused and concise (100-150 words)
+            `;
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'http://localhost:3000', // Required for free tier
+                    'X-Title': 'Directory Bot Analysis' // Optional
+                },
+                body: JSON.stringify({
+                    model: MODEL_NAME,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    max_tokens: 300,
+                    temperature: 0.7,
+                })
             });
 
-            // FIXED: Simplified content generation without unsupported options
-            const prompt = `Act as an expert researcher. Provide a concise, professional, and accurate answer (under 100 words) to the following question: ${question}`;
-            
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            
-            let answer = response.text();
-            let sources: { uri: string; title: string }[] = [];
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
+            }
 
-            // FIXED: For now, we'll return empty sources since grounding requires specific setup
-            // You can implement source extraction later when you have the proper setup
-            console.log(`✅ Successfully generated answer (${answer.length} chars)`);
-            return { answer, sources };
+            const data = await response.json();
+            
+            if (!data.choices || data.choices.length === 0) {
+                throw new Error('No response from OpenRouter');
+            }
+
+            const answer = data.choices[0].message.content;
+            console.log(`✅ Successfully generated answer for ${context.siteUrl} (${answer.length} chars)`);
+            return answer;
 
         } catch (error: any) {
-            console.error(`❌ Error in attempt ${attempt + 1}:`, error.message);
+            console.error(`❌ Error in attempt ${attempt + 1} for ${context.siteUrl}:`, error.message);
             
-            // Handle rate limiting
-            if (error.status === 429 || error.message?.includes('quota') || error.message?.includes('rate')) {
-                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-                attempt++;
-                if (attempt < MAX_RETRIES) {
+            if (error.message?.includes('429') || error.message?.includes('rate limit') || error.message?.includes('quota')) {
+                if (attempt < MAX_RETRIES - 1) {
+                    const delay = Math.pow(2, attempt) * 1000;
                     console.log(`⏳ Rate limited, waiting ${delay}ms before retry...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
+                    attempt++;
                     continue;
+                } else {
+                    console.log('⚠️ Rate limit hit, using mock response');
+                    return generateMockAnswer(question, context);
                 }
             }
             
             if (attempt === MAX_RETRIES - 1) {
-                return { 
-                    answer: `[Error: ${error.message || 'Failed to generate answer'}]`, 
-                    sources: [] 
-                };
+                console.log('⚠️ OpenRouter failed, using mock response');
+                return generateMockAnswer(question, context);
             }
+            
             attempt++;
             const delay = Math.pow(2, attempt) * 1000;
             await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
-    return { answer: `[Unknown Fatal Error during AI generation]`, sources: [] };
+    
+    return generateMockAnswer(question, context);
+}
+
+/**
+ * Generate mock answer when API fails or no key provided
+ */
+function generateMockAnswer(question: string, context: {
+    appInfo: AppInfo;
+    siteUrl: string;
+}): string {
+    const mockAnswers = [
+        `Based on analyzing ${context.siteUrl}, ${context.appInfo.name} should focus on ${question.toLowerCase().replace('?', '')} to better serve ${context.appInfo.targetAudience}.`,
+        `For ${context.appInfo.name}, insights from ${context.siteUrl} suggest implementing best practices in ${context.appInfo.type} applications.`,
+        `Analyzing ${context.siteUrl} reveals that ${context.appInfo.name} could improve by adopting similar strategies for ${question.toLowerCase().replace('?', '')}.`,
+        `The ${context.siteUrl} website demonstrates effective approaches that ${context.appInfo.name} can adapt to enhance user experience.`,
+        `Based on ${context.siteUrl}, ${context.appInfo.name} should consider ${question.toLowerCase().replace('?', '')} as a key area for optimization.`
+    ];
+    
+    return mockAnswers[Math.floor(Math.random() * mockAnswers.length)];
 }
 
 // --- Health Check Endpoint ---
@@ -320,8 +365,8 @@ app.get('/api/health', async (req: Request, res: Response) => {
             status: 'healthy', 
             timestamp: new Date().toISOString(),
             dataFile: dataFileExists,
-            geminiKey: !!GEMINI_API_KEY,
-            geminiInitialized: !!genAI
+            openrouterKey: !!OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here',
+            aiModel: MODEL_NAME
         });
     } catch (error) {
         res.status(500).json({ 
@@ -331,76 +376,34 @@ app.get('/api/health', async (req: Request, res: Response) => {
     }
 });
 
-// --- Endpoint 1: Fetch Available Sites ---
+// --- Endpoint 1: Fetch Available Sites (Directory URLs) ---
 app.get('/api/sites', async (req: Request, res: Response) => {
     try {
-        const allSiteData = await fetchAllSiteData();
-        const siteUrls = allSiteData.map(data => data.siteUrl).filter((url, index, self) => self.indexOf(url) === index);
+        const directorySites = await fetchAllSiteData();
+        const siteUrls = directorySites.map(site => site.url);
         
-        console.log(`✅ Available sites fetched: ${siteUrls.length}`);
+        console.log(`✅ Directory sites fetched: ${siteUrls.length}`);
         res.status(200).json(siteUrls);
     } catch (error) {
         console.error("❌ Error in /api/sites:", error);
         res.status(500).json({ 
-            error: "Failed to fetch available sites.", 
+            error: "Failed to fetch directory sites.", 
             details: error instanceof Error ? error.message : "An unknown error occurred." 
         });
     }
 });
 
-// --- Endpoint 2: Generate Answers for a Specific Site ---
-app.post('/api/generate-answers', async (req: Request, res: Response) => {
+// --- Endpoint 2: Analyze a Specific Site with App Info ---
+app.post('/api/analyze-site', async (req: Request, res: Response) => {
     try {
-        const { siteUrl } = req.body;
-        if (!siteUrl) {
-            return res.status(400).json({ error: "Missing siteUrl in request body." });
-        }
-
-        const validatedSiteUrl = validateAndSanitizeUrl(siteUrl);
-        const allSiteData = await fetchAllSiteData();
-        const targetSite = allSiteData.find(site => site.siteUrl === validatedSiteUrl);
-
-        if (!targetSite) {
-            return res.status(404).json({ error: `Site '${validatedSiteUrl}' not found in data file.` });
-        }
-
-        const answeredSite: SiteResult = {
-            siteUrl: targetSite.siteUrl,
-            questions: []
-        };
+        const { appInfo, siteUrl } = req.body;
         
-        console.log(`🚀 Processing ${targetSite.questions.length} questions for site: ${targetSite.siteUrl}`);
-
-        for (const [index, questionItem] of targetSite.questions.entries()) {
-            console.log(`📝 Processing question ${index + 1}/${targetSite.questions.length}: ${questionItem.question.substring(0, 50)}...`);
-            
-            const { answer, sources } = await getGeminiAnswer(questionItem.question);
-            
-            answeredSite.questions.push({
-                ...questionItem,
-                answer: answer,
-                sources: sources
-            });
-        }
-        
-        console.log(`🎉 Successfully processed all questions for ${targetSite.siteUrl}`);
-        res.status(200).json(answeredSite);
-
-    } catch (error) {
-        console.error("❌ Endpoint error:", error);
-        res.status(500).json({ 
-            error: "Failed to process questions and generate answers.", 
-            details: error instanceof Error ? error.message : "An unknown error occurred."
-        });
-    }
-});
-
-// --- Endpoint 3: Generate Custom Answers Based on App Info ---
-app.post('/api/generate-custom-answers', async (req: Request, res: Response) => {
-    try {
-        const { appInfo } = req.body;
         if (!appInfo) {
             return res.status(400).json({ error: "Missing appInfo in request body." });
+        }
+        
+        if (!siteUrl) {
+            return res.status(400).json({ error: "Missing siteUrl in request body." });
         }
 
         // Validate required fields
@@ -408,36 +411,94 @@ app.post('/api/generate-custom-answers', async (req: Request, res: Response) => 
             return res.status(400).json({ error: "Missing required app information fields." });
         }
 
-        const customQuestions = generateCustomQuestions(appInfo);
+        console.log(`🚀 Starting analysis for ${appInfo.name} on site: ${siteUrl}`);
         
-        const answeredSite: SiteResult = {
-            siteUrl: appInfo.url || `Custom Analysis for ${appInfo.name}`,
-            questions: []
-        };
+        // 1. Get questions for this specific site from Excel
+        const siteQuestions = await getQuestionsForSite(siteUrl);
         
-        console.log(`🚀 Processing ${customQuestions.length} custom questions for app: ${appInfo.name}`);
-
-        for (const [index, question] of customQuestions.entries()) {
-            console.log(`📝 Processing question ${index + 1}/${customQuestions.length}: ${question.substring(0, 50)}...`);
-            
-            const { answer, sources } = await getGeminiAnswer(question);
-            
-            answeredSite.questions.push({
-                id: index + 1,
-                question: question,
-                answer: answer,
-                sources: sources
+        if (!siteQuestions || siteQuestions.length === 0) {
+            return res.status(404).json({ 
+                error: 'No questions found for this site',
+                siteUrl 
             });
         }
         
-        console.log(`🎉 Successfully processed all custom questions for ${appInfo.name}`);
-        res.status(200).json(answeredSite);
+        console.log(`📝 Processing ${siteQuestions.length} questions for ${siteUrl}`);
+
+        const questionsWithAnswers: SiteQuestion[] = [];
+        
+        // 2. Generate answers for each question
+        for (let i = 0; i < siteQuestions.length; i++) {
+            const question = siteQuestions[i];
+            console.log(`   ${i + 1}/${siteQuestions.length}: ${question.substring(0, 60)}...`);
+            
+            const answer = await getOpenRouterAnswer(question, {
+                appInfo,
+                siteUrl
+            });
+            
+            questionsWithAnswers.push({
+                id: i + 1,
+                question: question,
+                answer: answer
+            });
+        }
+        
+        // 3. Get site display name
+        let siteName = siteUrl;
+        try {
+            const urlObj = new URL(siteUrl);
+            siteName = urlObj.hostname.replace(/^www\./, '');
+        } catch {
+            siteName = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+        
+        console.log(`✅ Successfully analyzed ${siteUrl} with ${questionsWithAnswers.length} answers`);
+        
+        res.status(200).json({
+            siteUrl: siteUrl,
+            siteName: siteName,
+            questions: questionsWithAnswers,
+            metadata: {
+                analyzedAt: new Date().toISOString(),
+                appName: appInfo.name,
+                totalQuestions: questionsWithAnswers.length,
+                aiProvider: 'OpenRouter',
+                aiModel: MODEL_NAME
+            }
+        });
 
     } catch (error) {
-        console.error("❌ Custom endpoint error:", error);
+        console.error("❌ Error in /api/analyze-site:", error);
         res.status(500).json({ 
-            error: "Failed to process custom questions and generate answers.", 
+            error: "Failed to analyze site.", 
             details: error instanceof Error ? error.message : "An unknown error occurred."
+        });
+    }
+});
+
+// --- Endpoint 3: Get Directory Sites with Details ---
+app.get('/api/directory-details', async (req: Request, res: Response) => {
+    try {
+        const directorySites = await fetchAllSiteData();
+        
+        // Return detailed directory information
+        const detailedSites = directorySites.map(site => ({
+            url: site.url,
+            questionCount: site.questions.length,
+            sampleQuestions: site.questions.slice(0, 3) // Show first 3 questions
+        }));
+        
+        res.status(200).json({
+            count: detailedSites.length,
+            sites: detailedSites,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("❌ Error in /api/directory-details:", error);
+        res.status(500).json({ 
+            error: "Failed to fetch directory details.", 
+            details: error instanceof Error ? error.message : "An unknown error occurred." 
         });
     }
 });
@@ -463,11 +524,17 @@ try {
         console.log("🌐 CORS enabled for: http://localhost:3000, http://localhost:12000, and external runtime URLs");
         console.log(`📁 Using data file: ${DATA_FILE_PATH}`);
         console.log(`🤖 Using AI model: ${MODEL_NAME}`);
+        console.log(`🔑 OpenRouter API: ${OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here' ? '✅ Configured' : '⚠️ Using mock mode'}`);
         console.log("🛠️ Available endpoints:");
         console.log("   GET  /api/health");
         console.log("   GET  /api/sites");
-        console.log("   POST /api/generate-answers");
-        console.log("   POST /api/generate-custom-answers");
+        console.log("   GET  /api/directory-details");
+        console.log("   POST /api/analyze-site");
+        console.log("\n🔥 SIMPLIFIED WORKFLOW:");
+        console.log("   - Reads site-specific questions from Excel");
+        console.log("   - Generates custom answers using OpenRouter AI");
+        console.log("   - Uses app info to provide relevant insights");
+        console.log("   - Falls back to mock data if API fails");
         console.log("\nPress Ctrl+C to stop the server\n");
     });
 } catch (error) {

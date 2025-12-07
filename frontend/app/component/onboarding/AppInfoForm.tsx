@@ -5,19 +5,20 @@ import { gsap } from 'gsap';
 import { AppInfo } from '../../types/onboarding';
 import { FormProgress } from './FormProgress';
 import './AppInfoForm.css';
+import { useRouter } from 'next/navigation';
 
 interface AppInfoFormProps {
   onSubmit: (appInfo: AppInfo) => Promise<void>;
   onBack: () => void;
 }
 
-interface AnalysisResult {
+interface SiteAnalysis {
   siteUrl: string;
+  siteName: string;
   questions: {
     id: number;
     question: string;
     answer: string;
-    sources: { uri: string; title: string }[];
   }[];
 }
 
@@ -36,10 +37,11 @@ const techOptions = [
 ];
 
 export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<SiteAnalysis[] | null>(null);
   const [formData, setFormData] = useState<AppInfo>({
     url: '',
     name: '',
@@ -67,18 +69,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   useEffect(() => {
     if (containerRef.current) {
       gsap.fromTo(containerRef.current,
-        {
-          opacity: 0,
-          scale: 0.9,
-          y: 50
-        },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "back.out(1.7)"
-        }
+        { opacity: 0, scale: 0.9, y: 50 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "back.out(1.7)" }
       );
     }
   }, []);
@@ -86,62 +78,123 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   useEffect(() => {
     if (stepContentRef.current) {
       gsap.fromTo(stepContentRef.current,
-        {
-          opacity: 0,
-          x: currentStep > 1 ? 50 : -50
-        },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.5,
-          ease: "power2.out"
-        }
+        { opacity: 0, x: currentStep > 1 ? 50 : -50 },
+        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }
       );
     }
   }, [currentStep]);
 
-  // Animate results when they appear
   useEffect(() => {
     if (analysisResult && resultsRef.current) {
       gsap.fromTo(resultsRef.current,
-        {
-          opacity: 0,
-          y: 30
-        },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.6,
-          ease: "power2.out",
-          stagger: 0.1
-        }
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power2.out", stagger: 0.1 }
       );
     }
   }, [analysisResult]);
 
-  // Save analysis to localStorage when received
-  useEffect(() => {
-    if (analysisResult) {
-      saveAnalysisToStorage(analysisResult);
-    }
-  }, [analysisResult]);
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🚀 Submitting app info for analysis:', formData);
+      
+      // Get sites first
+      const sitesResponse = await fetch('http://localhost:3004/api/sites');
+      if (!sitesResponse.ok) {
+        throw new Error(`Failed to fetch sites: ${sitesResponse.status}`);
+      }
+      const siteUrls: string[] = await sitesResponse.json();
+      
+      // LIMIT to only 3-5 sites for now to avoid overloading
+      const limitedSiteUrls = siteUrls.slice(0, 5); // ← REDUCED TO 5 SITES (from 25)
+      
+      console.log('📋 Sites to analyze (limited):', limitedSiteUrls);
+      
+      const allAnalyses: SiteAnalysis[] = [];
+      
+      // Process sites ONE BY ONE with delays
+      for (let i = 0; i < limitedSiteUrls.length; i++) {
+        const siteUrl = limitedSiteUrls[i];
+        try {
+          console.log(`📍 Analyzing site ${i + 1}/${limitedSiteUrls.length}: ${siteUrl}`);
+          
+          const analysisResponse = await fetch('http://localhost:3004/api/analyze-site', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              appInfo: formData,
+              siteUrl: siteUrl
+            }),
+          });
 
-  // Load saved analysis on component mount
-  useEffect(() => {
-    const savedAnalysis = loadAnalysisFromStorage();
-    if (savedAnalysis) {
-      setAnalysisResult(savedAnalysis);
-    }
-  }, []);
+          if (!analysisResponse.ok) {
+            console.warn(`⚠️ Failed to analyze ${siteUrl}: ${analysisResponse.status}`);
+            continue;
+          }
 
-  const saveAnalysisToStorage = (result: AnalysisResult) => {
+          const result = await analysisResponse.json();
+          
+          // Add site analysis if it has questions
+          if (result.questions && result.questions.length > 0) {
+            allAnalyses.push({
+              siteUrl: siteUrl,
+              siteName: getSiteDisplayName(siteUrl),
+              questions: result.questions
+            });
+          }
+          
+          // Add delay between requests to avoid overloading
+          if (i < limitedSiteUrls.length - 1) {
+            console.log(`⏳ Waiting 1 second before next site...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+        } catch (siteError) {
+          console.warn(`⚠️ Error analyzing ${siteUrl}:`, siteError);
+        }
+      }
+      
+      if (allAnalyses.length === 0) {
+        throw new Error('No analyses generated for any site');
+      }
+      
+      console.log('✅ All analyses received:', allAnalyses);
+      
+      // Save to localStorage with more detailed structure
+      saveAnalysisToStorage(allAnalyses);
+      
+      // Call parent onSubmit
+      await onSubmit(formData);
+      
+      // REDIRECT TO RESULTS PAGE IMMEDIATELY
+      console.log('🔀 Redirecting to results page...');
+      router.push('/results');
+      
+    } catch (err) {
+      console.error('❌ Analysis error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate analysis';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveAnalysisToStorage = (result: SiteAnalysis[]) => {
     try {
       const timestamp = new Date().toISOString();
       const analysisWithMetadata = {
-        ...result,
+        analyses: result,
+        appInfo: formData,
         timestamp,
-        appName: formData.name,
-        appType: formData.type
+        metadata: {
+          totalSites: result.length,
+          totalQuestions: result.reduce((total, site) => total + site.questions.length, 0),
+          generatedAt: timestamp
+        }
       };
       
       // Get existing results
@@ -151,104 +204,26 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       const updatedResults = [analysisWithMetadata, ...existingResults.slice(0, 4)];
       
       localStorage.setItem(analysisStorageKey, JSON.stringify(updatedResults));
-      console.log('✅ Analysis saved to localStorage');
+      console.log('✅ Analysis saved to localStorage:', {
+        sites: result.length,
+        totalQuestions: analysisWithMetadata.metadata.totalQuestions
+      });
     } catch (error) {
       console.error('❌ Error saving analysis:', error);
     }
   };
 
-  const loadAnalysisFromStorage = (): AnalysisResult | null => {
+  const getSiteDisplayName = (url: string): string => {
     try {
-      const savedResults = JSON.parse(localStorage.getItem(analysisStorageKey) || '[]');
-      if (savedResults.length > 0) {
-        // Return the most recent analysis
-        const latest = savedResults[0];
-        // Remove metadata before returning
-        const { timestamp, appName, appType, ...analysisResult } = latest;
-        return analysisResult as AnalysisResult;
-      }
-    } catch (error) {
-      console.error('❌ Error loading analysis:', error);
-    }
-    return null;
-  };
-
-  const saveResultToBackend = async (result: AnalysisResult): Promise<void> => {
-    try {
-      const response = await fetch('http://localhost:3001/api/save-analysis', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          analysis: result,
-          appInfo: formData,
-          timestamp: new Date().toISOString()
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save analysis to backend');
-      }
-
-      console.log('✅ Analysis saved to backend');
-    } catch (error) {
-      console.error('❌ Error saving to backend:', error);
-      // Don't throw error - this is just for temporary storage
+      const domain = new URL(url).hostname;
+      return domain.replace(/^www\./, '');
+    } catch {
+      return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     }
   };
 
   const updateFormData = (field: keyof AppInfo, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      console.log('🚀 Submitting app info for analysis:', formData);
-      
-      const response = await fetch('http://localhost:3003/api/generate-custom-answers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ appInfo: formData }),
-      });
-
-      console.log('📡 Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Analysis received:', result);
-      
-      // Set result for display
-      setAnalysisResult(result);
-      
-      // Save to localStorage
-      saveAnalysisToStorage(result);
-      
-      // Also save to backend if needed (temporary storage)
-      await saveResultToBackend(result);
-      
-      // Call parent onSubmit with form data
-      await onSubmit(formData);
-      
-    } catch (err) {
-      console.error('❌ Analysis error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate analysis';
-      setError(errorMessage);
-      
-      // Show error animation
-     
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleNext = () => {
@@ -316,15 +291,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
 
   const animateButtonClick = (element: HTMLElement) => {
     gsap.fromTo(element,
-      {
-        scale: 1
-      },
-      {
-        scale: 0.95,
-        duration: 0.1,
-        yoyo: true,
-        repeat: 1
-      }
+      { scale: 1 },
+      { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }
     );
   };
 
@@ -494,8 +462,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
             <div className="aif-review-alert">
               <h3>Ready to analyze your app!</h3>
               <p>
-                Based on your information, we'll provide personalized insights and recommendations 
-                from our database of successful websites.
+                Based on your information, we'll analyze up to 5 directory sites and provide
+                specific insights for your app.
+              </p>
+              <p className="aif-note">
+                <small>⏱️ This may take a minute as we analyze each site individually...</small>
               </p>
             </div>
 
@@ -545,47 +516,27 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     return (
       <div className="aif-results" ref={resultsRef}>
         <div className="aif-results-header">
-          <h2>🎉 Your Analysis is Ready!</h2>
-          <p>Personalized insights for <strong>{formData.name}</strong></p>
+          <h2>🎉 Analysis Complete!</h2>
+          <p>Redirecting to detailed results page...</p>
           <div className="aif-results-meta">
             <span className="aif-timestamp">
               Generated: {new Date().toLocaleString()}
             </span>
+            <span className="aif-sites-count">
+              Analyzed {analysisResult.length} sites
+            </span>
           </div>
         </div>
 
-        <div className="aif-analysis-questions">
-          {analysisResult.questions.map((item, index) => (
-            <div key={item.id} className="aif-analysis-item">
-              <div className="aif-question-card">
-                <h3>Q{index + 1}: {item.question}</h3>
-                <div className="aif-answer">
-                  <p>{item.answer}</p>
-                </div>
-                {item.sources && item.sources.length > 0 && (
-                  <div className="aif-sources">
-                    <strong>Sources:</strong>
-                    <div className="aif-sources-list">
-                      {item.sources.map((source, idx) => (
-                        <a key={idx} href={source.uri} target="_blank" rel="noopener noreferrer" className="aif-source-link">
-                          {source.title || source.uri}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="aif-results-actions">
-          <button onClick={handleNewAnalysis} className="aif-btn aif-btn-primary">
-            🔄 Analyze Another App
+        <div className="aif-redirecting">
+          <div className="aif-spinner-large"></div>
+          <p>Taking you to the results page where you can see all analyzed sites...</p>
+          <button 
+            onClick={() => router.push('/results')}
+            className="aif-btn aif-btn-primary"
+          >
+            Go to Results Now →
           </button>
-          <div className="aif-storage-note">
-            <small>Analysis saved automatically. You can view previous analyses anytime.</small>
-          </div>
         </div>
       </div>
     );

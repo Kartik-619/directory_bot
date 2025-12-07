@@ -6,8 +6,7 @@ import { useSites } from './hooks/useSites';
 import { HeroSection } from './component/onboarding/HeroSection';
 import { AppInfoForm } from './component/onboarding/AppInfoForm';
 import { AppInfo } from './types/onboarding';
-import { Site } from './types/site';
- // Create this file for styles
+import './globals.css'; // Make sure this path is correct
 
 export default function Home() {
   const { isOnboardingComplete, appInfo, completeOnboarding, resetOnboarding } = useOnboarding();

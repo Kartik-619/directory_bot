@@ -2,7 +2,7 @@ import { Site } from '../types/site';  // Changed from '@/types/site'
 import { AppInfo } from '../types/onboarding';
 
 export class SiteService {
-  private static readonly API_BASE_URL = 'http://localhost:3003/api';
+  private static readonly API_BASE_URL = 'http://localhost:3004/api';
 
   static async fetchSites(): Promise<Site[]> {
     try {
