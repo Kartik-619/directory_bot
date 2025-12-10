@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { SiteGrid } from '.././component/home/SiteGrid';
-import { SiteService } from '../services/siteService';
 import './results.css';
 
 // Define the structure for site analysis results
@@ -23,6 +21,7 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<SiteAnalysis[]>([]);
   const [appInfo, setAppInfo] = useState<any>(null);
+  const [selectedSite, setSelectedSite] = useState<SiteAnalysis | null>(null);
 
   useEffect(() => {
     loadAnalysisResults();
@@ -63,11 +62,18 @@ export default function ResultsPage() {
     router.push('/');
   };
 
-  const formatSiteForGrid = (siteAnalysis: SiteAnalysis) => ({
-    url: siteAnalysis.siteUrl,
-    name: siteAnalysis.siteName,
-    analysis: siteAnalysis // Include the full analysis data
-  });
+  const getSiteDomain = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace(/^www\./, '');
+    } catch {
+      return url.replace(/^https?:\/\//, '').split('/')[0];
+    }
+  };
+
+  const getSiteInitial = (siteName: string): string => {
+    return siteName.charAt(0).toUpperCase();
+  };
 
   if (isLoading) {
     return (
@@ -83,7 +89,7 @@ export default function ResultsPage() {
       <div className="results-error">
         <h2>⚠️ Error Loading Results</h2>
         <p>{error}</p>
-        <button onClick={() => router.push('/')} className="action-btn">
+        <button onClick={() => router.push('/')} className="action-btn primary">
           Start New Analysis
         </button>
       </div>
@@ -136,18 +142,73 @@ export default function ResultsPage() {
       <div className="sites-analysis-section">
         <h2>Site-Specific Analysis</h2>
         <p className="section-description">
-          Each site was analyzed with questions specific to it. Click on any site to view detailed answers.
+          Click on any site card to view detailed answers. Each site was analyzed with questions specific to it.
         </p>
         
         <div className="sites-grid-container">
           {analysisResults.map((siteAnalysis) => (
-            <SiteAnalysisCard 
+            <div 
               key={siteAnalysis.siteUrl} 
-              analysis={siteAnalysis} 
-            />
+              className={`site-grid-card ${selectedSite?.siteUrl === siteAnalysis.siteUrl ? 'active' : ''}`}
+              onClick={() => setSelectedSite(siteAnalysis)}
+            >
+              <div className="site-icon">
+                {getSiteInitial(siteAnalysis.siteName)}
+              </div>
+              <div className="site-info">
+                <h3 className="site-domain">{getSiteDomain(siteAnalysis.siteUrl)}</h3>
+                <p className="site-url">{siteAnalysis.siteUrl}</p>
+                <span className="questions-badge">
+                  {siteAnalysis.questions.length} questions
+                </span>
+              </div>
+            </div>
           ))}
         </div>
       </div>
+
+      {/* Questions Modal */}
+      {selectedSite && (
+        <div className="questions-modal-overlay" onClick={() => setSelectedSite(null)}>
+          <div className="questions-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-content">
+                <div className="modal-site-icon">
+                  {getSiteInitial(selectedSite.siteName)}
+                </div>
+                <div className="modal-site-info">
+                  <h2>{selectedSite.siteName}</h2>
+                  <p className="modal-site-url">{selectedSite.siteUrl}</p>
+                  <span className="questions-badge">
+                    {selectedSite.questions.length} questions analyzed
+                  </span>
+                </div>
+              </div>
+              <button 
+                className="close-modal-btn"
+                onClick={() => setSelectedSite(null)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-content">
+              <div className="modal-questions-list">
+                {selectedSite.questions.map((q) => (
+                  <div key={q.id} className="modal-question-item">
+                    <h3>
+                      <span>Q{q.id}:</span> {q.question}
+                    </h3>
+                    <div className="modal-answer">
+                      <p>{q.answer}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="results-actions">
         <button onClick={handleNewAnalysis} className="action-btn primary">
@@ -157,53 +218,6 @@ export default function ResultsPage() {
           📄 Export Results
         </button>
       </div>
-    </div>
-  );
-}
-
-// Site Analysis Card Component (shows questions and answers)
-interface SiteAnalysisCardProps {
-  analysis: SiteAnalysis;
-}
-
-function SiteAnalysisCard({ analysis }: SiteAnalysisCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  
-  return (
-    <div className={`site-analysis-card ${expanded ? 'expanded' : ''}`}>
-      <div 
-        className="card-header"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="site-icon-large">
-          {SiteService.getSiteIcon(analysis.siteUrl)}
-        </div>
-        <div className="site-info">
-          <h3>{analysis.siteName}</h3>
-          <p className="site-url">{analysis.siteUrl}</p>
-          <div className="questions-count">
-            {analysis.questions.length} questions analyzed
-          </div>
-        </div>
-        <div className="expand-icon">
-          {expanded ? '−' : '+'}
-        </div>
-      </div>
-      
-      {expanded && (
-        <div className="card-content">
-          <div className="questions-list">
-            {analysis.questions.map((q) => (
-              <div key={q.id} className="question-item">
-                <h4>Q{q.id}: {q.question}</h4>
-                <div className="answer">
-                  <p>{q.answer}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
