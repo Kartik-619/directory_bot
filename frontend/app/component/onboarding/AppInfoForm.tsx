@@ -42,7 +42,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<SiteAnalysis[] | null>(null);
+  
+  // Initialize form data with new fields
   const [formData, setFormData] = useState<AppInfo>({
+    // Basic Info
     url: '',
     name: '',
     type: 'webapp',
@@ -50,6 +53,14 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     targetAudience: '',
     mainFeatures: [],
     techStack: [],
+    
+    // New Contact Information
+    email: '',
+    companyName: '',
+    contactName: '',
+    location: '',
+    githubUrl: '',
+    launchDate: '',
   });
 
   const formRef = useRef<HTMLDivElement>(null);
@@ -58,40 +69,75 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const resultsRef = useRef<HTMLDivElement>(null);
   const analysisStorageKey = 'app_analysis_results';
 
+  // Update steps to include contact info step
   const steps = [
     { id: 1, title: 'Basic Info', description: 'Tell us about your app' },
     { id: 2, title: 'Description', description: 'Describe your app' },
     { id: 3, title: 'Features & Tech', description: 'Key features and technology' },
-    { id: 4, title: 'Review', description: 'Confirm your details' },
+    { id: 4, title: 'Contact Info', description: 'Your contact information' },
+    { id: 5, title: 'Review', description: 'Confirm your details' },
   ];
 
-  // GSAP Animations
+  // ============ GSAP ANIMATIONS - ADD THESE BACK ============
+  
+  // Initial container animation
   useEffect(() => {
     if (containerRef.current) {
       gsap.fromTo(containerRef.current,
-        { opacity: 0, scale: 0.9, y: 50 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "back.out(1.7)" }
+        {
+          opacity: 0,
+          scale: 0.9,
+          y: 50
+        },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "back.out(1.7)"
+        }
       );
     }
   }, []);
 
+  // Step content animation on step change
   useEffect(() => {
     if (stepContentRef.current) {
       gsap.fromTo(stepContentRef.current,
-        { opacity: 0, x: currentStep > 1 ? 50 : -50 },
-        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }
+        {
+          opacity: 0,
+          x: currentStep > 1 ? 50 : -50
+        },
+        {
+          opacity: 1,
+          x: 0,
+          duration: 0.5,
+          ease: "power2.out"
+        }
       );
     }
   }, [currentStep]);
 
+  // Results animation when they appear
   useEffect(() => {
     if (analysisResult && resultsRef.current) {
       gsap.fromTo(resultsRef.current,
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, duration: 0.6, ease: "power2.out", stagger: 0.1 }
+        {
+          opacity: 0,
+          y: 30
+        },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "power2.out",
+          stagger: 0.1
+        }
       );
     }
   }, [analysisResult]);
+
+  // ============ REST OF THE CODE ============
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -108,7 +154,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       const siteUrls: string[] = await sitesResponse.json();
       
       // LIMIT to only 3-5 sites for now to avoid overloading
-      const limitedSiteUrls = siteUrls.slice(0, 5); // ← REDUCED TO 5 SITES (from 25)
+      const limitedSiteUrls = siteUrls.slice(0, 5);
       
       console.log('📋 Sites to analyze (limited):', limitedSiteUrls);
       
@@ -178,6 +224,9 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       console.error('❌ Analysis error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate analysis';
       setError(errorMessage);
+      
+      // Add error animation
+  
     } finally {
       setIsLoading(false);
     }
@@ -278,6 +327,12 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       targetAudience: '',
       mainFeatures: [],
       techStack: [],
+      email: '',
+      companyName: '',
+      contactName: '',
+      location: '',
+      githubUrl: '',
+      launchDate: '',
     });
     setCurrentStep(1);
     setError(null);
@@ -294,6 +349,21 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       { scale: 1 },
       { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }
     );
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateUrl = (url: string): boolean => {
+    if (!url) return true; // Optional field
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const renderStep = () => {
@@ -459,6 +529,108 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       case 4:
         return (
           <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-contact-info-header">
+              <h3>Contact Information</h3>
+              <p className="aif-contact-subtitle">
+                We'll use this information to personalize your analysis and for future updates.
+              </p>
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">Email Address *</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => updateFormData('email', e.target.value)}
+                placeholder="your.email@example.com"
+                className="aif-input"
+                required
+              />
+              {formData.email && !validateEmail(formData.email) && (
+                <div className="aif-validation-error">
+                  Please enter a valid email address
+                </div>
+              )}
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">Company Name</label>
+              <input
+                type="text"
+                value={formData.companyName}
+                onChange={(e) => updateFormData('companyName', e.target.value)}
+                placeholder="Your Company Name"
+                className="aif-input"
+              />
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">Contact Name *</label>
+              <input
+                type="text"
+                value={formData.contactName}
+                onChange={(e) => updateFormData('contactName', e.target.value)}
+                placeholder="Your Full Name"
+                className="aif-input"
+                required
+              />
+              {formData.contactName && formData.contactName.length < 2 && (
+                <div className="aif-validation-error">
+                  Please enter your full name
+                </div>
+              )}
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">Your Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => updateFormData('location', e.target.value)}
+                placeholder="City, Country"
+                className="aif-input"
+              />
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">GitHub URL</label>
+              <input
+                type="url"
+                value={formData.githubUrl}
+                onChange={(e) => updateFormData('githubUrl', e.target.value)}
+                placeholder="https://github.com/yourusername"
+                className="aif-input"
+              />
+              {formData.githubUrl && !validateUrl(formData.githubUrl) && (
+                <div className="aif-validation-error">
+                  Please enter a valid URL
+                </div>
+              )}
+              {formData.githubUrl && !formData.githubUrl.includes('github.com') && (
+                <div className="aif-validation-hint">
+                  Make sure this is a GitHub URL
+                </div>
+              )}
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">Launch Date</label>
+              <input
+                type="date"
+                value={formData.launchDate}
+                onChange={(e) => updateFormData('launchDate', e.target.value)}
+                className="aif-input"
+              />
+              <div className="aif-validation-hint">
+                If your app hasn't launched yet, enter your estimated launch date
+              </div>
+            </div>
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="aif-step-content" ref={stepContentRef}>
             <div className="aif-review-alert">
               <h3>Ready to analyze your app!</h3>
               <p>
@@ -471,34 +643,87 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
             </div>
 
             <div className="aif-review-list">
-              <div className="aif-review-item">
-                <span className="aif-review-label">URL:</span>
-                <span className="aif-review-value">{formData.url || 'Not provided'}</span>
+              <div className="aif-review-section">
+                <h4>Basic Information</h4>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">URL:</span>
+                  <span className="aif-review-value">{formData.url || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Name:</span>
+                  <span className="aif-review-value">{formData.name}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Type:</span>
+                  <span className="aif-review-value">{appTypes.find(t => t.value === formData.type)?.label}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Target Audience:</span>
+                  <span className="aif-review-value">{formData.targetAudience}</span>
+                </div>
               </div>
-              <div className="aif-review-item">
-                <span className="aif-review-label">Name:</span>
-                <span className="aif-review-value">{formData.name}</span>
+
+              <div className="aif-review-section">
+                <h4>Contact Information</h4>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Email:</span>
+                  <span className="aif-review-value">{formData.email}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Company:</span>
+                  <span className="aif-review-value">{formData.companyName || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Contact Name:</span>
+                  <span className="aif-review-value">{formData.contactName}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Location:</span>
+                  <span className="aif-review-value">{formData.location || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">GitHub:</span>
+                  <span className="aif-review-value">{formData.githubUrl || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Launch Date:</span>
+                  <span className="aif-review-value">
+                    {formData.launchDate 
+                      ? new Date(formData.launchDate).toLocaleDateString() 
+                      : 'Not specified'}
+                  </span>
+                </div>
               </div>
-              <div className="aif-review-item">
-                <span className="aif-review-label">Type:</span>
-                <span className="aif-review-value">{appTypes.find(t => t.value === formData.type)?.label}</span>
-              </div>
-              <div className="aif-review-item">
-                <span className="aif-review-label">Target Audience:</span>
-                <span className="aif-review-value">{formData.targetAudience}</span>
-              </div>
-              <div className="aif-review-item">
-                <span className="aif-review-label">Main Features:</span>
-                <div className="aif-features-list">
-                  {formData.mainFeatures.length > 0 ? (
-                    formData.mainFeatures.map(feature => (
-                      <span key={feature} className="aif-feature-tag">
-                        {feature}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="aif-no-features">No features selected</span>
-                  )}
+
+              <div className="aif-review-section">
+                <h4>Features & Technology</h4>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Main Features:</span>
+                  <div className="aif-features-list">
+                    {formData.mainFeatures.length > 0 ? (
+                      formData.mainFeatures.map(feature => (
+                        <span key={feature} className="aif-feature-tag">
+                          {feature}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="aif-no-features">No features selected</span>
+                    )}
+                  </div>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Tech Stack:</span>
+                  <div className="aif-tech-list">
+                    {formData.techStack.length > 0 ? (
+                      formData.techStack.map(tech => (
+                        <span key={tech} className="aif-tech-tag">
+                          {tech}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="aif-no-tech">No technologies selected</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -554,6 +779,9 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       case 3:
         return true;
       case 4:
+        return validateEmail(formData.email) && 
+               formData.contactName.trim().length >= 2;
+      case 5:
         return true;
       default:
         return false;

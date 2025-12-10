@@ -13,10 +13,10 @@ const PORT = 3004;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
-const MAX_QUESTIONS_PER_BATCH = 10; // Limit questions per batch
+const MAX_QUESTIONS_PER_BATCH = 10;
 
 // Use a free model from OpenRouter
-const MODEL_NAME = 'mistralai/mistral-7b-instruct:free'; // Free model
+const MODEL_NAME = 'mistralai/mistral-7b-instruct:free';
 
 // Rate limiting storage
 const rateLimit = new Map<string, number>();
@@ -54,6 +54,12 @@ interface AppInfo {
     targetAudience: string;
     mainFeatures: string[];
     techStack: string[];
+    email: string;
+    companyName: string;
+    contactName: string;
+    location: string;
+    githubUrl: string;
+    launchDate: string;
 }
 
 interface DirectorySite {
@@ -67,7 +73,7 @@ interface BatchQuestion {
 }
 
 interface BatchAnswers {
-    [key: number]: string; // id -> answer
+    [key: number]: string;
 }
 
 /**
@@ -77,7 +83,7 @@ function validateEnvironment(): void {
     if (OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here') {
         console.log('✅ OpenRouter API key loaded');
     } else {
-        console.log('⚠️  OPENROUTER_API_KEY not set - using fallback mock responses');
+        console.log('⚠️  OPENROUTER_API_KEY not set - using simple copy responses');
     }
 
     console.log('✅ Environment variables validated');
@@ -221,7 +227,6 @@ async function getQuestionsForSite(siteUrl: string): Promise<string[]> {
         }
         
         console.log(`⚠️ No questions found for ${siteUrl}, using default questions`);
-        // Return some default questions if none found
         return [
             'What can we learn from their user experience design?',
             'How do they handle customer engagement?',
@@ -236,184 +241,101 @@ async function getQuestionsForSite(siteUrl: string): Promise<string[]> {
 }
 
 /**
- * Generate mock answer for a single question
+ * Match question to user data and return the exact value
  */
-function generateMockAnswer(question: string, context: {
-    appInfo: AppInfo;
-    siteUrl: string;
-}): string {
-    const mockAnswers = [
-        `Based on ${context.siteUrl}, ${context.appInfo.name} should focus on ${question.toLowerCase().replace('?', '')}.`,
-        `Analyzing ${context.siteUrl} suggests ${context.appInfo.name} implement best practices for ${question.toLowerCase().replace('?', '')}.`,
-        `${context.siteUrl} shows effective strategies for ${question.toLowerCase().replace('?', '')} that ${context.appInfo.name} can adopt.`,
-        `For ${context.appInfo.name}, ${context.siteUrl} demonstrates how to optimize ${question.toLowerCase().replace('?', '')}.`,
-        `${context.appInfo.name} can learn from ${context.siteUrl}'s approach to ${question.toLowerCase().replace('?', '')}.`
-    ];
+function getExactUserData(question: string, appInfo: AppInfo): string {
+    const q = question.toLowerCase().trim();
     
-    return mockAnswers[Math.floor(Math.random() * mockAnswers.length)];
+    // Direct mapping of questions to user data fields
+    if (q.includes('name') && !q.includes('company') && !q.includes('product')) {
+        return appInfo.name || 'Not specified';
+    }
+    if (q.includes('email')) {
+        return appInfo.email || 'Not specified';
+    }
+    if (q.includes('website') || q.includes('url')) {
+        return appInfo.url || 'Not specified';
+    }
+    if (q.includes('company') && q.includes('name')) {
+        return appInfo.companyName || 'Not specified';
+    }
+    if (q.includes('contact') && q.includes('name')) {
+        return appInfo.contactName || 'Not specified';
+    }
+    if (q.includes('location')) {
+        return appInfo.location || 'Not specified';
+    }
+    if (q.includes('github') || q.includes('repository')) {
+        return appInfo.githubUrl || 'Not specified';
+    }
+    if (q.includes('launch') || q.includes('date')) {
+        return appInfo.launchDate || 'Not specified';
+    }
+    if (q.includes('description')) {
+        return appInfo.description || 'Not specified';
+    }
+    if (q.includes('audience') || q.includes('target')) {
+        return appInfo.targetAudience || 'Not specified';
+    }
+    if (q.includes('type')) {
+        return appInfo.type || 'Not specified';
+    }
+    if (q.includes('feature')) {
+        return appInfo.mainFeatures.join(', ') || 'Not specified';
+    }
+    if (q.includes('tech') || q.includes('stack')) {
+        return appInfo.techStack.join(', ') || 'Not specified';
+    }
+    
+    // Default: return the most relevant field or a simple response
+    return appInfo.name || 'User data';
 }
 
 /**
- * Generate mock answers for batch of questions
+ * Generate SIMPLE answer that copies user input
  */
-function generateMockBatchAnswers(questions: BatchQuestion[], context: {
+function generateSimpleAnswer(question: string, context: { 
+    appInfo: AppInfo;
+    siteUrl: string;
+}): string {
+    const userData = getExactUserData(question, context.appInfo);
+    
+    // Simple templates that just return the user's data
+    const templates = [
+        `${userData}`,
+        `The answer is: ${userData}`,
+        `Based on your input: ${userData}`,
+        `Your provided information: ${userData}`,
+        `${userData} (as you specified)`
+    ];
+    
+    return templates[Math.floor(Math.random() * templates.length)];
+}
+
+/**
+ * Generate simple answers for batch of questions
+ */
+function generateSimpleBatchAnswers(questions: BatchQuestion[], context: {
     appInfo: AppInfo;
     siteUrl: string;
 }): BatchAnswers {
     const answers: BatchAnswers = {};
     questions.forEach(q => {
-        answers[q.id] = generateMockAnswer(q.question, context);
+        answers[q.id] = generateSimpleAnswer(q.question, context);
     });
     return answers;
 }
 
 /**
- * Function to call the OpenRouter API for BATCH of questions
+ * Function to call the OpenRouter API - SIMPLIFIED to just return user data
  */
 async function getOpenRouterBatchAnswers(questions: BatchQuestion[], context: {
     appInfo: AppInfo;
     siteUrl: string;
 }): Promise<BatchAnswers> {
-    if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'your_openrouter_api_key_here') {
-        console.log('⚠️ No OpenRouter API key, using mock responses');
-        return generateMockBatchAnswers(questions, context);
-    }
-
-    if (!checkRateLimit(`batch-${context.siteUrl}`)) {
-        throw new Error("Rate limit exceeded. Please wait before making another request.");
-    }
-
-    const MAX_RETRIES = 2;
-    let attempt = 0;
-
-    while (attempt < MAX_RETRIES) {
-        try {
-            console.log(`🔍 OpenRouter BATCH API attempt ${attempt + 1} for site ${context.siteUrl}: ${questions.length} questions`);
-
-            // Create batch prompt with all questions
-            const questionsText = questions.map(q => `${q.id}. ${q.question}`).join('\n');
-            
-            const prompt = `
-ANALYSIS CONTEXT:
-YOUR APP: ${context.appInfo.name} (${context.appInfo.type})
-APP DESCRIPTION: ${context.appInfo.description}
-TARGET AUDIENCE: ${context.appInfo.targetAudience}
-KEY FEATURES: ${context.appInfo.mainFeatures.join(', ')}
-TECH STACK: ${context.appInfo.techStack.join(', ')}
-
-REFERENCE SITE TO ANALYZE: ${context.siteUrl}
-
-QUESTIONS ABOUT THIS SITE (answer each in order):
-${questionsText}
-
-INSTRUCTIONS:
-1. Analyze ${context.siteUrl} specifically for insights relevant to ${context.appInfo.name}
-2. Provide actionable advice for EACH question above
-3. Keep answers focused and concise (50-80 words each)
-4. Format your response as a JSON object where keys are question numbers (1, 2, 3...) and values are the answers
-5. Example format: {"1": "Your answer for question 1", "2": "Your answer for question 2"}
-
-JSON RESPONSE:
-            `;
-
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'http://localhost:3000',
-                    'X-Title': 'Directory Bot Analysis'
-                },
-                body: JSON.stringify({
-                    model: MODEL_NAME,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    max_tokens: 1500, // Increased for batch responses
-                    temperature: 0.7,
-                    response_format: { type: "json_object" }
-                })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
-            }
-
-            const data = await response.json();
-            
-            if (!data.choices || data.choices.length === 0) {
-                throw new Error('No response from OpenRouter');
-            }
-
-            const content = data.choices[0].message.content;
-            
-            // Parse JSON response
-            let parsedAnswers: any;
-            try {
-                parsedAnswers = JSON.parse(content);
-                
-                // CORRECTED: Convert string keys from AI to number keys for our BatchAnswers interface
-                const normalizedAnswers: BatchAnswers = {};
-                
-                // Handle both string keys ("1", "2") and number keys (1, 2)
-                Object.entries(parsedAnswers).forEach(([key, value]) => {
-                    const numKey = parseInt(key);
-                    if (!isNaN(numKey) && typeof value === 'string') {
-                        normalizedAnswers[numKey] = value;
-                    }
-                });
-                
-                // Validate that we have answers for all questions
-                const missingAnswers = questions.filter(q => !normalizedAnswers[q.id]);
-                if (missingAnswers.length > 0) {
-                    console.log(`⚠️ Missing answers for questions: ${missingAnswers.map(q => q.id).join(', ')}`);
-                    // Fill missing answers with mock
-                    missingAnswers.forEach(q => {
-                        normalizedAnswers[q.id] = generateMockAnswer(q.question, context);
-                    });
-                }
-                
-                console.log(`✅ Successfully generated batch answers for ${context.siteUrl} (${questions.length} questions)`);
-                return normalizedAnswers;
-
-            } catch (parseError) {
-                console.error('❌ Failed to parse JSON response, using mock answers:', parseError);
-                console.log('Raw response:', content);
-                return generateMockBatchAnswers(questions, context);
-            }
-
-        } catch (error: any) {
-            console.error(`❌ Error in attempt ${attempt + 1} for ${context.siteUrl}:`, error.message);
-            
-            if (error.message?.includes('429') || error.message?.includes('rate limit') || error.message?.includes('quota')) {
-                if (attempt < MAX_RETRIES - 1) {
-                    const delay = Math.pow(2, attempt) * 1000;
-                    console.log(`⏳ Rate limited, waiting ${delay}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    attempt++;
-                    continue;
-                } else {
-                    console.log('⚠️ Rate limit hit, using mock responses');
-                    return generateMockBatchAnswers(questions, context);
-                }
-            }
-            
-            if (attempt === MAX_RETRIES - 1) {
-                console.log('⚠️ OpenRouter failed, using mock responses');
-                return generateMockBatchAnswers(questions, context);
-            }
-            
-            attempt++;
-            const delay = Math.pow(2, attempt) * 1000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-    
-    return generateMockBatchAnswers(questions, context);
+    // Always use simple copy responses - no AI analysis needed
+    console.log('⚠️ Using simple copy responses (no AI analysis)');
+    return generateSimpleBatchAnswers(questions, context);
 }
 
 // --- Health Check Endpoint ---
@@ -425,8 +347,10 @@ app.get('/api/health', async (req: Request, res: Response) => {
             timestamp: new Date().toISOString(),
             dataFile: dataFileExists,
             openrouterKey: !!OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here',
-            aiModel: MODEL_NAME,
-            batchMode: true
+            aiModel: 'NONE - Simple copy mode',
+            batchMode: true,
+            answerStyle: 'simple-copy-user-input',
+            description: 'Simply returns user input data without AI analysis'
         });
     } catch (error) {
         res.status(500).json({ 
@@ -453,7 +377,7 @@ app.get('/api/sites', async (req: Request, res: Response) => {
     }
 });
 
-// --- Endpoint 2: Analyze a Specific Site with App Info (BATCH MODE) ---
+// --- Endpoint 2: Analyze a Specific Site with App Info (SIMPLE COPY MODE) ---
 app.post('/api/analyze-site', async (req: Request, res: Response) => {
     try {
         const { appInfo, siteUrl } = req.body;
@@ -467,11 +391,12 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
         }
 
         // Validate required fields
-        if (!appInfo.name || !appInfo.type || !appInfo.description || !appInfo.targetAudience) {
-            return res.status(400).json({ error: "Missing required app information fields." });
+        if (!appInfo.name) {
+            return res.status(400).json({ error: "Missing required app name field." });
         }
 
-        console.log(`🚀 Starting BATCH analysis for ${appInfo.name} on site: ${siteUrl}`);
+        console.log(`🚀 Starting SIMPLE COPY mode for ${appInfo.name}`);
+        console.log(`📋 Will return your exact input data for each question`);
         
         // 1. Get questions for this specific site from Excel
         const siteQuestions = await getQuestionsForSite(siteUrl);
@@ -486,7 +411,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
         // Limit questions per batch
         const limitedQuestions = siteQuestions.slice(0, MAX_QUESTIONS_PER_BATCH);
         
-        console.log(`📝 Processing ${limitedQuestions.length} questions in BATCH for ${siteUrl}`);
+        console.log(`📝 Processing ${limitedQuestions.length} questions for ${siteUrl}`);
 
         // Prepare batch questions
         const batchQuestions: BatchQuestion[] = limitedQuestions.map((question, index) => ({
@@ -494,7 +419,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             question: question
         }));
         
-        // 2. Get BATCH answers from OpenRouter
+        // 2. Get SIMPLE answers (just copy user input)
         const batchAnswers = await getOpenRouterBatchAnswers(batchQuestions, {
             appInfo,
             siteUrl
@@ -504,7 +429,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
         const questionsWithAnswers: SiteQuestion[] = batchQuestions.map(q => ({
             id: q.id,
             question: q.question,
-            answer: batchAnswers[q.id] || generateMockAnswer(q.question, { appInfo, siteUrl })
+            answer: batchAnswers[q.id] || generateSimpleAnswer(q.question, { appInfo, siteUrl })
         }));
         
         // 4. Get site display name
@@ -516,7 +441,8 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             siteName = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
         }
         
-        console.log(`✅ Successfully analyzed ${siteUrl} with ${questionsWithAnswers.length} answers (BATCH MODE)`);
+        console.log(`✅ Successfully processed ${siteUrl} with ${questionsWithAnswers.length} responses`);
+        console.log(`📊 Sample response: Q: "${questionsWithAnswers[0]?.question}" → A: "${questionsWithAnswers[0]?.answer}"`);
         
         res.status(200).json({
             siteUrl: siteUrl,
@@ -525,18 +451,23 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             metadata: {
                 analyzedAt: new Date().toISOString(),
                 appName: appInfo.name,
-                totalQuestions: questionsWithAnswers.length,
-                aiProvider: 'OpenRouter',
-                aiModel: MODEL_NAME,
-                mode: 'batch',
-                requestsSaved: limitedQuestions.length - 1 // Show how many requests we saved
+                mode: 'simple-copy-user-input',
+                description: 'Returns your exact input data without AI analysis',
+                userDataProvided: {
+                    name: appInfo.name || 'Not specified',
+                    email: appInfo.email || 'Not specified',
+                    url: appInfo.url || 'Not specified',
+                    companyName: appInfo.companyName || 'Not specified',
+                    contactName: appInfo.contactName || 'Not specified',
+                    location: appInfo.location || 'Not specified'
+                }
             }
         });
 
     } catch (error) {
         console.error("❌ Error in /api/analyze-site:", error);
         res.status(500).json({ 
-            error: "Failed to analyze site.", 
+            error: "Failed to process site.", 
             details: error instanceof Error ? error.message : "An unknown error occurred."
         });
     }
@@ -551,7 +482,7 @@ app.get('/api/directory-details', async (req: Request, res: Response) => {
         const detailedSites = directorySites.map(site => ({
             url: site.url,
             questionCount: site.questions.length,
-            sampleQuestions: site.questions.slice(0, 3) // Show first 3 questions
+            sampleQuestions: site.questions.slice(0, 3)
         }));
         
         res.status(200).json({
@@ -564,6 +495,85 @@ app.get('/api/directory-details', async (req: Request, res: Response) => {
         res.status(500).json({ 
             error: "Failed to fetch directory details.", 
             details: error instanceof Error ? error.message : "An unknown error occurred." 
+        });
+    }
+});
+
+// --- Endpoint 4: Quick Test (for debugging) ---
+app.post('/api/test-analysis', async (req: Request, res: Response) => {
+    try {
+        const { appInfo, siteUrl } = req.body;
+        
+        if (!appInfo || !siteUrl) {
+            return res.status(400).json({ 
+                error: "Missing appInfo or siteUrl",
+                example: {
+                    appInfo: {
+                        name: "MyProduct",
+                        email: "contact@myproduct.com",
+                        url: "https://myproduct.com",
+                        companyName: "MyCompany Inc",
+                        contactName: "John Doe",
+                        location: "San Francisco, USA",
+                        type: "saas",
+                        description: "A project management tool",
+                        targetAudience: "Remote teams"
+                    },
+                    siteUrl: "https://trello.com"
+                }
+            });
+        }
+
+        // Test with common questions
+        const testQuestions: BatchQuestion[] = [
+            { id: 1, question: "Your Name" },
+            { id: 2, question: "Your Email" },
+            { id: 3, question: "Website URL" },
+            { id: 4, question: "Company Name" },
+            { id: 5, question: "Location" }
+        ];
+        
+        console.log(`🧪 TEST SIMPLE COPY MODE`);
+        console.log(`📤 Product Name: ${appInfo.name}`);
+        console.log(`📤 Email: ${appInfo.email}`);
+        console.log(`📤 URL: ${appInfo.url}`);
+        
+        const batchAnswers = await getOpenRouterBatchAnswers(testQuestions, {
+            appInfo,
+            siteUrl
+        });
+        
+        const results = testQuestions.map(q => ({
+            question: q.question,
+            answer: batchAnswers[q.id] || "No data",
+            expectedData: getExactUserData(q.question, appInfo)
+        }));
+        
+        console.log(`✅ Test results (showing exact user data):`);
+        results.forEach(r => {
+            console.log(`  Q: "${r.question}"`);
+            console.log(`  A: "${r.answer}"`);
+            console.log(`  Expected: "${r.expectedData}"`);
+            console.log(`  Match: ${r.answer.includes(r.expectedData) ? '✅' : '❌'}`);
+        });
+        
+        res.status(200).json({
+            success: true,
+            test: {
+                productName: appInfo.name,
+                siteUrl: siteUrl,
+                questions: results,
+                generatedAt: new Date().toISOString()
+            },
+            mode: 'simple-copy-user-input',
+            description: 'Returns your exact input data without AI analysis'
+        });
+
+    } catch (error) {
+        console.error("❌ Error in /api/test-analysis:", error);
+        res.status(500).json({ 
+            error: "Test failed.", 
+            details: error instanceof Error ? error.message : "An unknown error occurred."
         });
     }
 });
@@ -588,20 +598,19 @@ try {
         console.log(`📊 Health check available at: http://localhost:${PORT}/api/health`);
         console.log("🌐 CORS enabled for: http://localhost:3000, http://localhost:12000, and external runtime URLs");
         console.log(`📁 Using data file: ${DATA_FILE_PATH}`);
-        console.log(`🤖 Using AI model: ${MODEL_NAME}`);
-        console.log(`🔑 OpenRouter API: ${OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here' ? '✅ Configured' : '⚠️ Using mock mode'}`);
-        console.log(`⚡ BATCH MODE: Enabled (max ${MAX_QUESTIONS_PER_BATCH} questions per request)`);
+        console.log(`🤖 AI MODEL: NONE (Simple copy mode)`);
+        console.log(`🎯 MODE: SIMPLE COPY USER INPUT`);
+        console.log(`📋 Description: Returns your exact input data without AI analysis`);
         console.log("🛠️ Available endpoints:");
         console.log("   GET  /api/health");
         console.log("   GET  /api/sites");
         console.log("   GET  /api/directory-details");
-        console.log("   POST /api/analyze-site    ← NOW IN BATCH MODE");
-        console.log("\n🔥 OPTIMIZED WORKFLOW:");
-        console.log("   - Reads site-specific questions from Excel");
-        console.log("   - Sends ALL questions in ONE API call");
-        console.log("   - Receives JSON response with all answers");
-        console.log("   - Uses app info to provide relevant insights");
-        console.log("   - Falls back to mock data if API fails");
+        console.log("   POST /api/analyze-site          ← Returns your exact input data");
+        console.log("   POST /api/test-analysis         ← Test endpoint");
+        console.log("\nExample responses:");
+        console.log('  Q: "Your Name" → A: "YourProductName"');
+        console.log('  Q: "Your Email" → A: "your@email.com"');
+        console.log('  Q: "Website URL" → A: "https://yourwebsite.com"');
         console.log("\nPress Ctrl+C to stop the server\n");
     });
 } catch (error) {
