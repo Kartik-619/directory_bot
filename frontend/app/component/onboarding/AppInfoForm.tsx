@@ -164,7 +164,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       const siteUrls: string[] = await sitesResponse.json();
       
       // LIMIT to only 3-5 sites for now to avoid overloading
-      const limitedSiteUrls = siteUrls.slice(0, 5);
+      const limitedSiteUrls = siteUrls.slice(0, 15);
       
       console.log('📋 Sites to analyze (limited):', limitedSiteUrls);
       
