@@ -13,13 +13,10 @@ const PORT = 3004;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
+const MAX_QUESTIONS_PER_BATCH = 10; // Limit questions per batch
 
 // Use a free model from OpenRouter
 const MODEL_NAME = 'mistralai/mistral-7b-instruct:free'; // Free model
-// Alternative free models:
-// - 'google/gemma-2b-it:free'
-// - 'huggingfaceh4/zephyr-7b-beta:free'
-// - 'meta-llama/llama-3.2-3b-instruct:free'
 
 // Rate limiting storage
 const rateLimit = new Map<string, number>();
@@ -62,6 +59,15 @@ interface AppInfo {
 interface DirectorySite {
     url: string;
     questions: string[];
+}
+
+interface BatchQuestion {
+    id: number;
+    question: string;
+}
+
+interface BatchAnswers {
+    [key: number]: string; // id -> answer
 }
 
 /**
@@ -230,18 +236,50 @@ async function getQuestionsForSite(siteUrl: string): Promise<string[]> {
 }
 
 /**
- * Function to call the OpenRouter API for site-specific answers
+ * Generate mock answer for a single question
  */
-async function getOpenRouterAnswer(question: string, context: {
+function generateMockAnswer(question: string, context: {
     appInfo: AppInfo;
     siteUrl: string;
-}): Promise<string> {
+}): string {
+    const mockAnswers = [
+        `Based on ${context.siteUrl}, ${context.appInfo.name} should focus on ${question.toLowerCase().replace('?', '')}.`,
+        `Analyzing ${context.siteUrl} suggests ${context.appInfo.name} implement best practices for ${question.toLowerCase().replace('?', '')}.`,
+        `${context.siteUrl} shows effective strategies for ${question.toLowerCase().replace('?', '')} that ${context.appInfo.name} can adopt.`,
+        `For ${context.appInfo.name}, ${context.siteUrl} demonstrates how to optimize ${question.toLowerCase().replace('?', '')}.`,
+        `${context.appInfo.name} can learn from ${context.siteUrl}'s approach to ${question.toLowerCase().replace('?', '')}.`
+    ];
+    
+    return mockAnswers[Math.floor(Math.random() * mockAnswers.length)];
+}
+
+/**
+ * Generate mock answers for batch of questions
+ */
+function generateMockBatchAnswers(questions: BatchQuestion[], context: {
+    appInfo: AppInfo;
+    siteUrl: string;
+}): BatchAnswers {
+    const answers: BatchAnswers = {};
+    questions.forEach(q => {
+        answers[q.id] = generateMockAnswer(q.question, context);
+    });
+    return answers;
+}
+
+/**
+ * Function to call the OpenRouter API for BATCH of questions
+ */
+async function getOpenRouterBatchAnswers(questions: BatchQuestion[], context: {
+    appInfo: AppInfo;
+    siteUrl: string;
+}): Promise<BatchAnswers> {
     if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'your_openrouter_api_key_here') {
-        console.log('⚠️ No OpenRouter API key, using mock response');
-        return generateMockAnswer(question, context);
+        console.log('⚠️ No OpenRouter API key, using mock responses');
+        return generateMockBatchAnswers(questions, context);
     }
 
-    if (!checkRateLimit(`${question}-${context.siteUrl}`)) {
+    if (!checkRateLimit(`batch-${context.siteUrl}`)) {
         throw new Error("Rate limit exceeded. Please wait before making another request.");
     }
 
@@ -250,9 +288,11 @@ async function getOpenRouterAnswer(question: string, context: {
 
     while (attempt < MAX_RETRIES) {
         try {
-            console.log(`🔍 OpenRouter API attempt ${attempt + 1} for site ${context.siteUrl}: "${question.substring(0, 50)}..."`);
+            console.log(`🔍 OpenRouter BATCH API attempt ${attempt + 1} for site ${context.siteUrl}: ${questions.length} questions`);
 
-            // Create site-specific prompt
+            // Create batch prompt with all questions
+            const questionsText = questions.map(q => `${q.id}. ${q.question}`).join('\n');
+            
             const prompt = `
 ANALYSIS CONTEXT:
 YOUR APP: ${context.appInfo.name} (${context.appInfo.type})
@@ -263,14 +303,17 @@ TECH STACK: ${context.appInfo.techStack.join(', ')}
 
 REFERENCE SITE TO ANALYZE: ${context.siteUrl}
 
-SPECIFIC QUESTION ABOUT THIS SITE: ${question}
+QUESTIONS ABOUT THIS SITE (answer each in order):
+${questionsText}
 
 INSTRUCTIONS:
 1. Analyze ${context.siteUrl} specifically for insights relevant to ${context.appInfo.name}
-2. Provide actionable advice that ${context.appInfo.name} can implement
-3. Focus on practical strategies and best practices
-4. Reference specific aspects of ${context.siteUrl} when applicable
-5. Keep answer focused and concise (100-150 words)
+2. Provide actionable advice for EACH question above
+3. Keep answers focused and concise (50-80 words each)
+4. Format your response as a JSON object where keys are question numbers (1, 2, 3...) and values are the answers
+5. Example format: {"1": "Your answer for question 1", "2": "Your answer for question 2"}
+
+JSON RESPONSE:
             `;
 
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -278,8 +321,8 @@ INSTRUCTIONS:
                 headers: {
                     'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': 'http://localhost:3000', // Required for free tier
-                    'X-Title': 'Directory Bot Analysis' // Optional
+                    'HTTP-Referer': 'http://localhost:3000',
+                    'X-Title': 'Directory Bot Analysis'
                 },
                 body: JSON.stringify({
                     model: MODEL_NAME,
@@ -289,8 +332,9 @@ INSTRUCTIONS:
                             content: prompt
                         }
                     ],
-                    max_tokens: 300,
+                    max_tokens: 1500, // Increased for batch responses
                     temperature: 0.7,
+                    response_format: { type: "json_object" }
                 })
             });
 
@@ -305,9 +349,42 @@ INSTRUCTIONS:
                 throw new Error('No response from OpenRouter');
             }
 
-            const answer = data.choices[0].message.content;
-            console.log(`✅ Successfully generated answer for ${context.siteUrl} (${answer.length} chars)`);
-            return answer;
+            const content = data.choices[0].message.content;
+            
+            // Parse JSON response
+            let parsedAnswers: any;
+            try {
+                parsedAnswers = JSON.parse(content);
+                
+                // CORRECTED: Convert string keys from AI to number keys for our BatchAnswers interface
+                const normalizedAnswers: BatchAnswers = {};
+                
+                // Handle both string keys ("1", "2") and number keys (1, 2)
+                Object.entries(parsedAnswers).forEach(([key, value]) => {
+                    const numKey = parseInt(key);
+                    if (!isNaN(numKey) && typeof value === 'string') {
+                        normalizedAnswers[numKey] = value;
+                    }
+                });
+                
+                // Validate that we have answers for all questions
+                const missingAnswers = questions.filter(q => !normalizedAnswers[q.id]);
+                if (missingAnswers.length > 0) {
+                    console.log(`⚠️ Missing answers for questions: ${missingAnswers.map(q => q.id).join(', ')}`);
+                    // Fill missing answers with mock
+                    missingAnswers.forEach(q => {
+                        normalizedAnswers[q.id] = generateMockAnswer(q.question, context);
+                    });
+                }
+                
+                console.log(`✅ Successfully generated batch answers for ${context.siteUrl} (${questions.length} questions)`);
+                return normalizedAnswers;
+
+            } catch (parseError) {
+                console.error('❌ Failed to parse JSON response, using mock answers:', parseError);
+                console.log('Raw response:', content);
+                return generateMockBatchAnswers(questions, context);
+            }
 
         } catch (error: any) {
             console.error(`❌ Error in attempt ${attempt + 1} for ${context.siteUrl}:`, error.message);
@@ -320,14 +397,14 @@ INSTRUCTIONS:
                     attempt++;
                     continue;
                 } else {
-                    console.log('⚠️ Rate limit hit, using mock response');
-                    return generateMockAnswer(question, context);
+                    console.log('⚠️ Rate limit hit, using mock responses');
+                    return generateMockBatchAnswers(questions, context);
                 }
             }
             
             if (attempt === MAX_RETRIES - 1) {
-                console.log('⚠️ OpenRouter failed, using mock response');
-                return generateMockAnswer(question, context);
+                console.log('⚠️ OpenRouter failed, using mock responses');
+                return generateMockBatchAnswers(questions, context);
             }
             
             attempt++;
@@ -336,25 +413,7 @@ INSTRUCTIONS:
         }
     }
     
-    return generateMockAnswer(question, context);
-}
-
-/**
- * Generate mock answer when API fails or no key provided
- */
-function generateMockAnswer(question: string, context: {
-    appInfo: AppInfo;
-    siteUrl: string;
-}): string {
-    const mockAnswers = [
-        `Based on analyzing ${context.siteUrl}, ${context.appInfo.name} should focus on ${question.toLowerCase().replace('?', '')} to better serve ${context.appInfo.targetAudience}.`,
-        `For ${context.appInfo.name}, insights from ${context.siteUrl} suggest implementing best practices in ${context.appInfo.type} applications.`,
-        `Analyzing ${context.siteUrl} reveals that ${context.appInfo.name} could improve by adopting similar strategies for ${question.toLowerCase().replace('?', '')}.`,
-        `The ${context.siteUrl} website demonstrates effective approaches that ${context.appInfo.name} can adapt to enhance user experience.`,
-        `Based on ${context.siteUrl}, ${context.appInfo.name} should consider ${question.toLowerCase().replace('?', '')} as a key area for optimization.`
-    ];
-    
-    return mockAnswers[Math.floor(Math.random() * mockAnswers.length)];
+    return generateMockBatchAnswers(questions, context);
 }
 
 // --- Health Check Endpoint ---
@@ -366,7 +425,8 @@ app.get('/api/health', async (req: Request, res: Response) => {
             timestamp: new Date().toISOString(),
             dataFile: dataFileExists,
             openrouterKey: !!OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here',
-            aiModel: MODEL_NAME
+            aiModel: MODEL_NAME,
+            batchMode: true
         });
     } catch (error) {
         res.status(500).json({ 
@@ -393,7 +453,7 @@ app.get('/api/sites', async (req: Request, res: Response) => {
     }
 });
 
-// --- Endpoint 2: Analyze a Specific Site with App Info ---
+// --- Endpoint 2: Analyze a Specific Site with App Info (BATCH MODE) ---
 app.post('/api/analyze-site', async (req: Request, res: Response) => {
     try {
         const { appInfo, siteUrl } = req.body;
@@ -411,7 +471,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Missing required app information fields." });
         }
 
-        console.log(`🚀 Starting analysis for ${appInfo.name} on site: ${siteUrl}`);
+        console.log(`🚀 Starting BATCH analysis for ${appInfo.name} on site: ${siteUrl}`);
         
         // 1. Get questions for this specific site from Excel
         const siteQuestions = await getQuestionsForSite(siteUrl);
@@ -423,28 +483,31 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             });
         }
         
-        console.log(`📝 Processing ${siteQuestions.length} questions for ${siteUrl}`);
+        // Limit questions per batch
+        const limitedQuestions = siteQuestions.slice(0, MAX_QUESTIONS_PER_BATCH);
+        
+        console.log(`📝 Processing ${limitedQuestions.length} questions in BATCH for ${siteUrl}`);
 
-        const questionsWithAnswers: SiteQuestion[] = [];
+        // Prepare batch questions
+        const batchQuestions: BatchQuestion[] = limitedQuestions.map((question, index) => ({
+            id: index + 1,
+            question: question
+        }));
         
-        // 2. Generate answers for each question
-        for (let i = 0; i < siteQuestions.length; i++) {
-            const question = siteQuestions[i];
-            console.log(`   ${i + 1}/${siteQuestions.length}: ${question.substring(0, 60)}...`);
-            
-            const answer = await getOpenRouterAnswer(question, {
-                appInfo,
-                siteUrl
-            });
-            
-            questionsWithAnswers.push({
-                id: i + 1,
-                question: question,
-                answer: answer
-            });
-        }
+        // 2. Get BATCH answers from OpenRouter
+        const batchAnswers = await getOpenRouterBatchAnswers(batchQuestions, {
+            appInfo,
+            siteUrl
+        });
         
-        // 3. Get site display name
+        // 3. Convert batch answers to SiteQuestion array
+        const questionsWithAnswers: SiteQuestion[] = batchQuestions.map(q => ({
+            id: q.id,
+            question: q.question,
+            answer: batchAnswers[q.id] || generateMockAnswer(q.question, { appInfo, siteUrl })
+        }));
+        
+        // 4. Get site display name
         let siteName = siteUrl;
         try {
             const urlObj = new URL(siteUrl);
@@ -453,7 +516,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
             siteName = siteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
         }
         
-        console.log(`✅ Successfully analyzed ${siteUrl} with ${questionsWithAnswers.length} answers`);
+        console.log(`✅ Successfully analyzed ${siteUrl} with ${questionsWithAnswers.length} answers (BATCH MODE)`);
         
         res.status(200).json({
             siteUrl: siteUrl,
@@ -464,7 +527,9 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
                 appName: appInfo.name,
                 totalQuestions: questionsWithAnswers.length,
                 aiProvider: 'OpenRouter',
-                aiModel: MODEL_NAME
+                aiModel: MODEL_NAME,
+                mode: 'batch',
+                requestsSaved: limitedQuestions.length - 1 // Show how many requests we saved
             }
         });
 
@@ -525,14 +590,16 @@ try {
         console.log(`📁 Using data file: ${DATA_FILE_PATH}`);
         console.log(`🤖 Using AI model: ${MODEL_NAME}`);
         console.log(`🔑 OpenRouter API: ${OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'your_openrouter_api_key_here' ? '✅ Configured' : '⚠️ Using mock mode'}`);
+        console.log(`⚡ BATCH MODE: Enabled (max ${MAX_QUESTIONS_PER_BATCH} questions per request)`);
         console.log("🛠️ Available endpoints:");
         console.log("   GET  /api/health");
         console.log("   GET  /api/sites");
         console.log("   GET  /api/directory-details");
-        console.log("   POST /api/analyze-site");
-        console.log("\n🔥 SIMPLIFIED WORKFLOW:");
+        console.log("   POST /api/analyze-site    ← NOW IN BATCH MODE");
+        console.log("\n🔥 OPTIMIZED WORKFLOW:");
         console.log("   - Reads site-specific questions from Excel");
-        console.log("   - Generates custom answers using OpenRouter AI");
+        console.log("   - Sends ALL questions in ONE API call");
+        console.log("   - Receives JSON response with all answers");
         console.log("   - Uses app info to provide relevant insights");
         console.log("   - Falls back to mock data if API fails");
         console.log("\nPress Ctrl+C to stop the server\n");
