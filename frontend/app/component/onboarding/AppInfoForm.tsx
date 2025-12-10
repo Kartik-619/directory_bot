@@ -36,6 +36,12 @@ const techOptions = [
   'WordPress', 'Shopify', 'MongoDB', 'PostgreSQL', 'AWS', 'Google Cloud', 'Firebase'
 ];
 
+const categoryOptions = [
+  'Business', 'Technology', 'Education', 'Entertainment', 'Health & Fitness',
+  'Lifestyle', 'Productivity', 'Social', 'Finance', 'Travel', 'Food & Drink',
+  'Shopping', 'News', 'Music', 'Photography', 'Gaming'
+];
+
 export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -61,6 +67,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     location: '',
     githubUrl: '',
     launchDate: '',
+    
+    // ADDED NEW FIELDS
+    tagline: '', // Added for first page
+    category: '', // Added for second page
   });
 
   const formRef = useRef<HTMLDivElement>(null);
@@ -333,6 +343,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       location: '',
       githubUrl: '',
       launchDate: '',
+      tagline: '', // Reset new field
+      category: '', // Reset new field
     });
     setCurrentStep(1);
     setError(null);
@@ -404,6 +416,27 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               )}
             </div>
 
+            {/* ADDED TAGLINE FIELD */}
+            <div className="aif-form-group">
+              <label className="aif-label">Tagline *</label>
+              <input
+                type="text"
+                value={formData.tagline || ''}
+                onChange={(e) => updateFormData('tagline', e.target.value)}
+                placeholder="A short, catchy phrase that describes your app"
+                className="aif-input"
+                required
+              />
+              <div className="aif-char-counter">
+                {(formData.tagline || '').length}/60 characters
+              </div>
+              {formData.tagline && formData.tagline.length < 10 && (
+                <div className="aif-validation-hint">
+                  Keep it short and catchy (10-60 characters)
+                </div>
+              )}
+            </div>
+
             <div className="aif-form-group">
               <label className="aif-label">App Type *</label>
               <div className="aif-type-grid">
@@ -447,6 +480,33 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               {formData.description && formData.description.length < 50 && (
                 <div className="aif-validation-hint">
                   Please provide more details (at least 50 characters)
+                </div>
+              )}
+            </div>
+
+            {/* ADDED CATEGORY FIELD */}
+            <div className="aif-form-group">
+              <label className="aif-label">Category *</label>
+              <div className="aif-category-grid">
+                {categoryOptions.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={(e) => {
+                      updateFormData('category', category);
+                      animateButtonClick(e.currentTarget);
+                    }}
+                    className={`aif-category-btn ${
+                      formData.category === category ? 'aif-category-selected' : ''
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+              {formData.category && (
+                <div className="aif-selected-category">
+                  Selected: <strong>{formData.category}</strong>
                 </div>
               )}
             </div>
@@ -654,8 +714,16 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                   <span className="aif-review-value">{formData.name}</span>
                 </div>
                 <div className="aif-review-item">
+                  <span className="aif-review-label">Tagline:</span>
+                  <span className="aif-review-value">{formData.tagline || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
                   <span className="aif-review-label">Type:</span>
                   <span className="aif-review-value">{appTypes.find(t => t.value === formData.type)?.label}</span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">Category:</span>
+                  <span className="aif-review-value">{formData.category || 'Not selected'}</span>
                 </div>
                 <div className="aif-review-item">
                   <span className="aif-review-label">Target Audience:</span>
@@ -772,10 +840,12 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     
     switch (currentStep) {
       case 1:
-        return formData.name.trim().length >= 3;
+        return formData.name.trim().length >= 3 && 
+               (formData.tagline || '').trim().length >= 10;
       case 2:
         return formData.description.trim().length >= 50 && 
-               formData.targetAudience.trim().length >= 10;
+               formData.targetAudience.trim().length >= 10 &&
+               (formData.category || '').trim().length > 0;
       case 3:
         return true;
       case 4:
