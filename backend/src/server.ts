@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import * as XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
+import { google } from 'googleapis';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -13,6 +14,12 @@ const PORT = 3004;
 const DATA_FILE_PATH = process.env.DATA_FILE_PATH || './data/Directory_Bot.xlsx';
 const MAX_ROWS = 1000;
 const MAX_QUESTIONS_PER_BATCH = 10;
+
+// Google Sheets Configuration
+const GOOGLE_SHEETS_CLIENT_EMAIL = process.env.GOOGLE_SHEETS_CLIENT_EMAIL;
+const GOOGLE_SHEETS_PRIVATE_KEY = process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const GOOGLE_SHEETS_SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+const GOOGLE_SHEETS_SHEET_NAME = process.env.GOOGLE_SHEETS_SHEET_NAME || 'UserSubmissions';
 
 // --- Setup Middlewares ---
 app.use(cors({
@@ -91,6 +98,153 @@ interface BatchAnswers {
  */
 function validateEnvironment(): void {
     console.log('✅ Environment variables validated');
+    
+    // Check Google Sheets configuration
+    if (GOOGLE_SHEETS_CLIENT_EMAIL && GOOGLE_SHEETS_PRIVATE_KEY && GOOGLE_SHEETS_SPREADSHEET_ID) {
+        console.log('✅ Google Sheets integration enabled');
+    } else {
+        console.log('⚠️  Google Sheets integration disabled - missing environment variables');
+    }
+}
+
+/**
+ * Initialize Google Sheets API
+ */
+async function initializeGoogleSheets() {
+    if (!GOOGLE_SHEETS_CLIENT_EMAIL || !GOOGLE_SHEETS_PRIVATE_KEY || !GOOGLE_SHEETS_SPREADSHEET_ID) {
+        console.log('⚠️  Google Sheets not configured - skipping initialization');
+        return null;
+    }
+
+    try {
+        const auth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: GOOGLE_SHEETS_CLIENT_EMAIL,
+                private_key: GOOGLE_SHEETS_PRIVATE_KEY,
+            },
+            scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+
+        const sheets = google.sheets({ version: 'v4', auth });
+        
+        // Test the connection
+        const response = await sheets.spreadsheets.get({
+            spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
+        });
+        
+        console.log(`✅ Connected to Google Sheets: ${response.data.properties?.title}`);
+        return sheets;
+    } catch (error) {
+        console.error('❌ Failed to initialize Google Sheets:', error);
+        return null;
+    }
+}
+
+/**
+ * Save user data to Google Sheets
+ */
+async function saveToGoogleSheets(appInfo: AppInfo, siteUrl: string): Promise<boolean> {
+    if (!GOOGLE_SHEETS_CLIENT_EMAIL || !GOOGLE_SHEETS_PRIVATE_KEY || !GOOGLE_SHEETS_SPREADSHEET_ID) {
+        console.log('⚠️  Google Sheets not configured - skipping save');
+        return false;
+    }
+
+    try {
+        const sheets = await initializeGoogleSheets();
+        if (!sheets) {
+            console.log('⚠️  Could not initialize Google Sheets');
+            return false;
+        }
+
+        const timestamp = new Date().toISOString();
+        
+        // Prepare the data row
+        const rowData = [
+            timestamp,
+            appInfo.name || '',
+            appInfo.email || '',
+            appInfo.contactName || '',
+            appInfo.companyName || '',
+            appInfo.url || '',
+            appInfo.githubUrl || '',
+            appInfo.linkedinUrl || '',
+            appInfo.xUrl || '',
+            appInfo.type || '',
+            appInfo.tagline || '',
+            appInfo.description || '',
+            appInfo.category || '',
+            appInfo.targetAudience || '',
+            appInfo.mainFeatures?.join('; ') || '',
+            appInfo.techStack?.join('; ') || '',
+            appInfo.location || '',
+            appInfo.launchDate || '',
+            appInfo.isReleased ? 'Yes' : 'No',
+            appInfo.enableGithubActions ? 'Yes' : 'No',
+            appInfo.enableLinkedinSharing ? 'Yes' : 'No',
+            siteUrl || 'N/A'
+        ];
+
+        // Get the current sheet to find the next empty row
+        const sheetResponse = await sheets.spreadsheets.values.get({
+            spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
+            range: `${GOOGLE_SHEETS_SHEET_NAME}!A:A`,
+        });
+
+        const nextRow = (sheetResponse.data.values?.length || 0) + 1;
+        
+        // If it's the first row, add headers
+        if (nextRow === 1) {
+            const headers = [
+                'Timestamp',
+                'App Name',
+                'Email',
+                'Contact Name',
+                'Company Name',
+                'Website URL',
+                'GitHub URL',
+                'LinkedIn URL',
+                'X/Twitter URL',
+                'App Type',
+                'Tagline',
+                'Description',
+                'Category',
+                'Target Audience',
+                'Main Features',
+                'Tech Stack',
+                'Location',
+                'Launch Date',
+                'Is Released',
+                'GitHub Actions Enabled',
+                'LinkedIn Sharing Enabled',
+                'Analyzed Site'
+            ];
+            
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
+                range: `${GOOGLE_SHEETS_SHEET_NAME}!A1:V1`,
+                valueInputOption: 'RAW',
+                requestBody: {
+                    values: [headers],
+                },
+            });
+        }
+
+        // Append the data
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: GOOGLE_SHEETS_SPREADSHEET_ID,
+            range: `${GOOGLE_SHEETS_SHEET_NAME}!A${nextRow}:V${nextRow}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [rowData],
+            },
+        });
+
+        console.log(`✅ User data saved to Google Sheets (row ${nextRow})`);
+        return true;
+    } catch (error) {
+        console.error('❌ Error saving to Google Sheets:', error);
+        return false;
+    }
 }
 
 /**
@@ -343,10 +497,13 @@ function logUserData(appInfo: AppInfo): void {
 app.get('/api/health', async (req: Request, res: Response) => {
     try {
         const dataFileExists = fs.existsSync(path.resolve(process.cwd(), DATA_FILE_PATH));
+        const googleSheetsConfigured = !!(GOOGLE_SHEETS_CLIENT_EMAIL && GOOGLE_SHEETS_PRIVATE_KEY && GOOGLE_SHEETS_SPREADSHEET_ID);
+        
         res.status(200).json({ 
             status: 'healthy', 
             timestamp: new Date().toISOString(),
             dataFile: dataFileExists,
+            googleSheets: googleSheetsConfigured,
             mode: 'exact-user-input',
             description: 'Returns EXACT user input as answers - no modifications',
             note: 'Empty strings are returned for fields not provided by user'
@@ -394,6 +551,17 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
         
         // Log EXACT data received
         logUserData(appInfo);
+        
+        // Save to Google Sheets (non-blocking, don't wait for it)
+        saveToGoogleSheets(appInfo, siteUrl).then(success => {
+            if (success) {
+                console.log('✅ User data successfully saved to Google Sheets');
+            } else {
+                console.log('⚠️  Could not save to Google Sheets');
+            }
+        }).catch(error => {
+            console.error('❌ Error in Google Sheets save:', error);
+        });
         
         // Get questions for this site
         const siteQuestions = await getQuestionsForSite(siteUrl);
@@ -453,6 +621,7 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
                 appName: appInfo.name || 'Unnamed App',
                 mode: 'exact-user-input',
                 description: 'Answers are EXACT user input values',
+                savedToGoogleSheets: true,
                 inputVerification: {
                     githubUrl: appInfo.githubUrl ? '✓ Provided' : '✗ Not provided',
                     linkedinUrl: appInfo.linkedinUrl ? '✓ Provided' : '✗ Not provided',
@@ -634,17 +803,35 @@ app.get('/api/directory-details', async (req: Request, res: Response) => {
 try {
     validateEnvironment();
     
+    // Initialize Google Sheets on startup
+    if (GOOGLE_SHEETS_CLIENT_EMAIL && GOOGLE_SHEETS_PRIVATE_KEY && GOOGLE_SHEETS_SPREADSHEET_ID) {
+        initializeGoogleSheets().then(sheets => {
+            if (sheets) {
+                console.log('✅ Google Sheets API initialized successfully');
+            }
+        });
+    }
+    
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`\n\n🎯 EXACT INPUT SERVER STARTED`);
         console.log(`📍 Running at http://localhost:${PORT}`);
         console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
         console.log(`📁 Data file: ${DATA_FILE_PATH}`);
         
+        if (GOOGLE_SHEETS_CLIENT_EMAIL && GOOGLE_SHEETS_PRIVATE_KEY && GOOGLE_SHEETS_SPREADSHEET_ID) {
+            console.log(`☁️  Google Sheets: ENABLED (Saving all user submissions)`);
+            console.log(`   Spreadsheet ID: ${GOOGLE_SHEETS_SPREADSHEET_ID}`);
+            console.log(`   Sheet name: ${GOOGLE_SHEETS_SHEET_NAME}`);
+        } else {
+            console.log(`⚠️  Google Sheets: DISABLED (Set environment variables to enable)`);
+        }
+        
         console.log('\n══════════════════════════════════════════');
         console.log('🚀 MODE: EXACT USER INPUT');
         console.log('📋 DESCRIPTION: Returns EXACTLY what you input');
         console.log('❌ NO default values, NO modifications');
         console.log('✅ Empty string if field not provided');
+        console.log('☁️  All data saved to Google Sheets');
         console.log('══════════════════════════════════════════\n');
         
         console.log('🛠️ ENDPOINTS:');
@@ -666,6 +853,12 @@ try {
         console.log('  Question: "What is your GitHub?"');
         console.log('  Answer: "https://github.com/myusername"');
         console.log('  (No modifications, no defaults)');
+        
+        console.log('\n☁️  GOOGLE SHEETS SAVES:');
+        console.log('  • All form data saved to cloud spreadsheet');
+        console.log('  • Timestamp of submission');
+        console.log('  • All URLs, contact info, and app details');
+        console.log('  • Analysis target site');
         
         console.log('\n⚠️  NOTE: If field is empty in form, answer will be empty string');
         console.log('\n✅ Server ready! Send your appInfo to /api/analyze-site');
