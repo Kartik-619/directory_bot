@@ -10,11 +10,18 @@ export interface AppInfo {
   
   // New Contact Information Fields
   email: string;
-  tagline:string;
-  category:string;
   companyName: string;
   contactName: string;
   location: string;
   githubUrl: string;
   launchDate: string;
+  
+  // ADDED NEW FIELDS
+  tagline: string;
+  category: string;
+  
+  // NEW: Social & Automation Fields
+  linkedinUrl: string;
+  enableGithubActions: boolean;
+  enableLinkedinSharing: boolean;
 }

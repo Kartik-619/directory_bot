@@ -49,7 +49,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<SiteAnalysis[] | null>(null);
   
-  // Initialize form data with new fields
+  // Initialize form data with ALL fields
   const [formData, setFormData] = useState<AppInfo>({
     // Basic Info
     url: '',
@@ -60,7 +60,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     mainFeatures: [],
     techStack: [],
     
-    // New Contact Information
+    // Contact Information
     email: '',
     companyName: '',
     contactName: '',
@@ -68,9 +68,14 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     githubUrl: '',
     launchDate: '',
     
-    // ADDED NEW FIELDS
-    tagline: '', // Added for first page
-    category: '', // Added for second page
+    // Marketing & Categorization
+    tagline: '',
+    category: '',
+    
+    // NEW: Social & Automation Fields
+    linkedinUrl: '',
+    enableGithubActions: false,
+    enableLinkedinSharing: false,
   });
 
   const formRef = useRef<HTMLDivElement>(null);
@@ -79,18 +84,17 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
   const resultsRef = useRef<HTMLDivElement>(null);
   const analysisStorageKey = 'app_analysis_results';
 
-  // Update steps to include contact info step
+  // Updated steps to include automation step
   const steps = [
     { id: 1, title: 'Basic Info', description: 'Tell us about your app' },
     { id: 2, title: 'Description', description: 'Describe your app' },
     { id: 3, title: 'Features & Tech', description: 'Key features and technology' },
     { id: 4, title: 'Contact Info', description: 'Your contact information' },
-    { id: 5, title: 'Review', description: 'Confirm your details' },
+    { id: 5, title: 'Automation', description: 'Automation preferences' }, // NEW STEP
+    { id: 6, title: 'Review', description: 'Confirm your details' },
   ];
 
-  // ============ GSAP ANIMATIONS - ADD THESE BACK ============
-  
-  // Initial container animation
+  // GSAP Animations
   useEffect(() => {
     if (containerRef.current) {
       gsap.fromTo(containerRef.current,
@@ -110,7 +114,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   }, []);
 
-  // Step content animation on step change
   useEffect(() => {
     if (stepContentRef.current) {
       gsap.fromTo(stepContentRef.current,
@@ -128,7 +131,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     }
   }, [currentStep]);
 
-  // Results animation when they appear
   useEffect(() => {
     if (analysisResult && resultsRef.current) {
       gsap.fromTo(resultsRef.current,
@@ -146,8 +148,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       );
     }
   }, [analysisResult]);
-
-  // ============ REST OF THE CODE ============
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -236,7 +236,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       setError(errorMessage);
       
       // Add error animation
-  
+      
     } finally {
       setIsLoading(false);
     }
@@ -343,8 +343,11 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       location: '',
       githubUrl: '',
       launchDate: '',
-      tagline: '', // Reset new field
-      category: '', // Reset new field
+      tagline: '',
+      category: '',
+      linkedinUrl: '',
+      enableGithubActions: false,
+      enableLinkedinSharing: false,
     });
     setCurrentStep(1);
     setError(null);
@@ -373,6 +376,16 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     try {
       new URL(url);
       return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const validateLinkedinUrl = (url: string): boolean => {
+    if (!url) return true; // Optional field
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.includes('linkedin.com');
     } catch {
       return false;
     }
@@ -416,7 +429,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               )}
             </div>
 
-            {/* ADDED TAGLINE FIELD */}
             <div className="aif-form-group">
               <label className="aif-label">Tagline *</label>
               <input
@@ -484,7 +496,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               )}
             </div>
 
-            {/* ADDED CATEGORY FIELD */}
             <div className="aif-form-group">
               <label className="aif-label">Category *</label>
               <div className="aif-category-grid">
@@ -688,7 +699,93 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
           </div>
         );
 
-      case 5:
+      case 5: // NEW AUTOMATION STEP
+        return (
+          <div className="aif-step-content" ref={stepContentRef}>
+            <div className="aif-automation-header">
+              <h3>Automation Preferences</h3>
+              <p className="aif-automation-subtitle">
+                Enable these features to automate your workflow and share insights.
+              </p>
+            </div>
+
+            <div className="aif-form-group">
+              <label className="aif-label">LinkedIn Profile URL</label>
+              <input
+                type="url"
+                value={formData.linkedinUrl || ''}
+                onChange={(e) => updateFormData('linkedinUrl', e.target.value)}
+                placeholder="https://linkedin.com/in/yourprofile"
+                className="aif-input"
+              />
+              {formData.linkedinUrl && !validateLinkedinUrl(formData.linkedinUrl) && (
+                <div className="aif-validation-error">
+                  Please enter a valid LinkedIn URL
+                </div>
+              )}
+              <div className="aif-validation-hint">
+                Optional: We'll use this for social sharing if enabled below
+              </div>
+            </div>
+
+            <div className="aif-automation-features">
+              <div className="aif-automation-card">
+                <div className="aif-automation-header-row">
+                  <div className="aif-automation-icon">⚡</div>
+                  <div className="aif-automation-title">GitHub Actions</div>
+                  <label className="aif-switch">
+                    <input
+                      type="checkbox"
+                      checked={formData.enableGithubActions}
+                      onChange={(e) => updateFormData('enableGithubActions', e.target.checked)}
+                    />
+                    <span className="aif-slider"></span>
+                  </label>
+                </div>
+                <p className="aif-automation-description">
+                  Automatically create GitHub issues from analysis insights and set up CI/CD workflows.
+                </p>
+                <div className="aif-automation-benefits">
+                  <span className="aif-benefit-tag">Automated tickets</span>
+                  <span className="aif-benefit-tag">CI/CD setup</span>
+                  <span className="aif-benefit-tag">Project management</span>
+                </div>
+              </div>
+
+              <div className="aif-automation-card">
+                <div className="aif-automation-header-row">
+                  <div className="aif-automation-icon">📢</div>
+                  <div className="aif-automation-title">LinkedIn Sharing</div>
+                  <label className="aif-switch">
+                    <input
+                      type="checkbox"
+                      checked={formData.enableLinkedinSharing}
+                      onChange={(e) => updateFormData('enableLinkedinSharing', e.target.checked)}
+                    />
+                    <span className="aif-slider"></span>
+                  </label>
+                </div>
+                <p className="aif-automation-description">
+                  Automatically share key insights and analysis highlights on your LinkedIn profile.
+                </p>
+                <div className="aif-automation-benefits">
+                  <span className="aif-benefit-tag">Social sharing</span>
+                  <span className="aif-benefit-tag">Network growth</span>
+                  <span className="aif-benefit-tag">Thought leadership</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="aif-automation-note">
+              <small>
+                💡 These features can be configured later in your account settings.
+                Enabling them now helps us personalize your experience.
+              </small>
+            </div>
+          </div>
+        );
+
+      case 6: // Updated review step to include new fields
         return (
           <div className="aif-step-content" ref={stepContentRef}>
             <div className="aif-review-alert">
@@ -754,6 +851,10 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                   <span className="aif-review-value">{formData.githubUrl || 'Not provided'}</span>
                 </div>
                 <div className="aif-review-item">
+                  <span className="aif-review-label">LinkedIn:</span>
+                  <span className="aif-review-value">{formData.linkedinUrl || 'Not provided'}</span>
+                </div>
+                <div className="aif-review-item">
                   <span className="aif-review-label">Launch Date:</span>
                   <span className="aif-review-value">
                     {formData.launchDate 
@@ -792,6 +893,22 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
                       <span className="aif-no-tech">No technologies selected</span>
                     )}
                   </div>
+                </div>
+              </div>
+
+              <div className="aif-review-section">
+                <h4>Automation Settings</h4>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">GitHub Actions:</span>
+                  <span className={`aif-review-value ${formData.enableGithubActions ? 'aif-enabled' : 'aif-disabled'}`}>
+                    {formData.enableGithubActions ? '✅ Enabled' : '❌ Disabled'}
+                  </span>
+                </div>
+                <div className="aif-review-item">
+                  <span className="aif-review-label">LinkedIn Sharing:</span>
+                  <span className={`aif-review-value ${formData.enableLinkedinSharing ? 'aif-enabled' : 'aif-disabled'}`}>
+                    {formData.enableLinkedinSharing ? '✅ Enabled' : '❌ Disabled'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -852,6 +969,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         return validateEmail(formData.email) && 
                formData.contactName.trim().length >= 2;
       case 5:
+        return true; // Automation step is optional
+      case 6:
         return true;
       default:
         return false;
