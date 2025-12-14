@@ -108,7 +108,7 @@ export default function Home() {
 
       {/* NAV */}
       <nav ref={navRef} className="nav">
-        <div className="logo">Analyzer</div>
+        <div className="logo">Directory Bot</div>
         <button className="primary-btn" onClick={handleGetStarted}>
           Get Analysis
         </button>
