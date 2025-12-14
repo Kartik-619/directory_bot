@@ -1,160 +1,173 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useOnboarding } from './context/OnboardingContext';
-import { useSites } from './hooks/useSites';
-import { HeroSection } from './component/onboarding/HeroSection';
-import { AppInfoForm } from './component/onboarding/AppInfoForm';
-import { AppInfo } from './types/onboarding';
-import './globals.css'; // Make sure this path is correct
+import { useState, useEffect, useRef } from "react";
+import { useOnboarding } from "./context/OnboardingContext";
+import { AppInfoForm } from "./component/onboarding/AppInfoForm";
+import { AppInfo } from "./types/onboarding";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import "./ModernLanding.css";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 export default function Home() {
-  const { isOnboardingComplete, appInfo, completeOnboarding, resetOnboarding } = useOnboarding();
+  const { completeOnboarding } = useOnboarding();
   const [showForm, setShowForm] = useState(false);
-  const { sites, loading, error, refetch } = useSites();
 
-  // Create custom analysis based on app info - no hardcoded sites
+  const containerRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const particlesRef = useRef<HTMLDivElement>(null);
+
+  const handleGetStarted = () => setShowForm(true);
+
+  const handleFormSubmit = async (data: AppInfo) => {
+    await completeOnboarding(data);
+    setShowForm(false);
+  };
+
   useEffect(() => {
-    if (isOnboardingComplete && appInfo) {
-      console.log('Onboarding complete with app:', appInfo);
-      // You can use this to show results later
-    }
-  }, [isOnboardingComplete, appInfo]);
+    if (showForm) return;
 
-  const handleGetStarted = () => {
-    setShowForm(true);
-  };
+    const ctx = gsap.context(() => {
+      gsap.from(navRef.current, {
+        y: -80,
+        opacity: 0,
+        duration: 1,
+        ease: "power3.out",
+      });
 
-  const handleFormSubmit = async (formData: AppInfo) => {
-    await completeOnboarding(formData);
-    setShowForm(false);
-  };
+      gsap.from(titleRef.current, {
+        y: 60,
+        opacity: 0,
+        duration: 1.2,
+        delay: 0.3,
+        ease: "power3.out",
+      });
 
-  const handleBackToHero = () => {
-    setShowForm(false);
-  };
+      gsap.from(subtitleRef.current, {
+        y: 30,
+        opacity: 0,
+        duration: 1,
+        delay: 0.6,
+        ease: "power2.out",
+      });
 
-  const handleResetOnboarding = () => {
-    resetOnboarding();
-    setShowForm(false);
-  };
+      gsap.from(featuresRef.current?.children || [], {
+        y: 80,
+        opacity: 0,
+        stagger: 0.2,
+        duration: 0.8,
+        scrollTrigger: {
+          trigger: featuresRef.current,
+          start: "top 80%",
+        },
+      });
 
-  // Show onboarding flow if not completed
-  if (!isOnboardingComplete) {
-    if (showForm) {
-      return (
-        <div className="app-info-form-container">
-          <AppInfoForm 
-            onSubmit={handleFormSubmit}
-            onBack={handleBackToHero}
-          />
-        </div>
-      );
-    }
-    
+      gsap.from(".timeline-step", {
+        x: -100,
+        opacity: 0,
+        stagger: 0.3,
+        scrollTrigger: {
+          trigger: timelineRef.current,
+          start: "top 75%",
+        },
+      });
+
+      gsap.from(ctaRef.current, {
+        y: 60,
+        opacity: 0,
+        duration: 1,
+        scrollTrigger: {
+          trigger: ctaRef.current,
+          start: "top 85%",
+        },
+      });
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [showForm]);
+
+  if (showForm) {
     return (
-      <div className="hero-container">
-        <HeroSection onGetStarted={handleGetStarted} />
+      <div className="fullscreen dark-bg">
+        <AppInfoForm onSubmit={handleFormSubmit} onBack={() => setShowForm(false)} />
       </div>
     );
   }
 
-  // Show main directory interface after onboarding
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Loading your analysis...</p>
-      </div>
-    );
-  }
-
-  // After onboarding, show results page
   return (
-    <div className="results-page">
-      <div className="results-container">
-        <div className="results-header">
-          <h1>🎉 Analysis Complete!</h1>
-          <p className="subtitle">Your personalized insights for <strong>{appInfo?.name}</strong></p>
-          
-          <div className="app-info-card">
-            <div className="app-info-header">
-              <h3>Your App Info</h3>
-              <button 
-                onClick={handleResetOnboarding}
-                className="edit-btn"
-              >
-                Edit
-              </button>
-            </div>
-            
-            <div className="app-details">
-              <div className="detail-row">
-                <span className="label">Type:</span>
-                <span className="value">{appInfo?.type}</span>
-              </div>
-              <div className="detail-row">
-                <span className="label">Audience:</span>
-                <span className="value">{appInfo?.targetAudience}</span>
-              </div>
-              {appInfo?.url && (
-                <div className="detail-row">
-                  <span className="label">URL:</span>
-                  <a href={appInfo.url} target="_blank" rel="noopener noreferrer" className="value link">
-                    {appInfo.url}
-                  </a>
-                </div>
-              )}
-            </div>
+    <div ref={containerRef} className="landing-root fullscreen">
+      <div ref={particlesRef} className="particles-layer" />
+
+      {/* NAV */}
+      <nav ref={navRef} className="nav">
+        <div className="logo">Analyzer</div>
+        <button className="primary-btn" onClick={handleGetStarted}>
+          Get Analysis
+        </button>
+      </nav>
+
+      {/* HERO */}
+      <section className="hero">
+        <h1 ref={titleRef}>
+          Transform Your App <br />
+          <span>With AI Insights</span>
+        </h1>
+        <p ref={subtitleRef}>
+        Stop guessing. Get specific SaaS advice tailored to YOUR app.
+        </p>
+        <button className="primary-btn big" onClick={handleGetStarted}>
+          Start Free →
+        </button>
+      </section>
+
+      {/* FEATURES */}
+      <section ref={featuresRef} className="features">
+        {[
+          ["Competitive Intelligence", "Learn what actually converts."],
+          ["AI Personalization", "Insights tailored to your app."],
+          ["Actionable Roadmap", "Clear steps, zero fluff."],
+        ].map(([title, desc]) => (
+          <div key={title} className="feature-card">
+            <h3>{title}</h3>
+            <p>{desc}</p>
           </div>
-        </div>
+        ))}
+      </section>
 
-        <div className="results-actions">
-          <button 
-            onClick={() => console.log('View analysis')}
-            className="action-btn primary"
-          >
-            View Your AI Analysis
-          </button>
-          
-          <button 
-            onClick={handleResetOnboarding}
-            className="action-btn secondary"
-          >
-            Analyze Another App
-          </button>
-        </div>
-
-        <div className="features-preview">
-          <h3>What's next?</h3>
-          <div className="features-grid">
-            <div className="feature-preview">
-              <div className="feature-icon">📊</div>
-              <h4>Personalized Insights</h4>
-              <p>Get AI-powered recommendations specific to your app</p>
-            </div>
-            <div className="feature-preview">
-              <div className="feature-icon">🎯</div>
-              <h4>Growth Strategies</h4>
-              <p>Actionable tips to improve your application</p>
-            </div>
-            <div className="feature-preview">
-              <div className="feature-icon">🔍</div>
-              <h4>Competitive Analysis</h4>
-              <p>Learn from similar successful websites</p>
-            </div>
+      {/* TIMELINE */}
+      <section ref={timelineRef} className="timeline">
+        {[
+          "Describe your app",
+          "AI scans winning products",
+          "Personalized insights",
+          "Execution roadmap",
+        ].map((step, i) => (
+          <div key={i} className="timeline-step">
+            <span>{i + 1}</span>
+            <p>{step}</p>
           </div>
-        </div>
+        ))}
+      </section>
 
-        <div className="back-to-landing">
-          <button 
-            onClick={handleResetOnboarding}
-            className="back-btn"
-          >
-            ← Start Over
-          </button>
-        </div>
-      </div>
+      {/* CTA */}
+      <section ref={ctaRef} className="cta">
+        <h2>Ready to upgrade your product?</h2>
+        <button className="primary-btn big" onClick={handleGetStarted}>
+          Get My Free Analysis
+        </button>
+      </section>
+
+      <footer className="footer">
+        © {new Date().getFullYear()} Analyzer
+      </footer>
     </div>
   );
 }
