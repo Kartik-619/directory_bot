@@ -76,6 +76,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
     linkedinUrl: '',
     enableGithubActions: false,
     enableLinkedinSharing: false,
+    xUrl: '', // Add X (Twitter) URL field
+    isReleased: false, // Add released toggle
   });
 
   const formRef = useRef<HTMLDivElement>(null);
@@ -348,6 +350,8 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       linkedinUrl: '',
       enableGithubActions: false,
       enableLinkedinSharing: false,
+      xUrl: '', // Add X (Twitter) URL field
+      isReleased: false, // Add released toggle
     });
     setCurrentStep(1);
     setError(null);
@@ -597,108 +601,173 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
           </div>
         );
 
-      case 4:
-        return (
-          <div className="aif-step-content" ref={stepContentRef}>
-            <div className="aif-contact-info-header">
-              <h3>Contact Information</h3>
-              <p className="aif-contact-subtitle">
-                We'll use this information to personalize your analysis and for future updates.
-              </p>
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">Email Address *</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => updateFormData('email', e.target.value)}
-                placeholder="your.email@example.com"
-                className="aif-input"
-                required
-              />
-              {formData.email && !validateEmail(formData.email) && (
-                <div className="aif-validation-error">
-                  Please enter a valid email address
-                </div>
-              )}
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">Company Name</label>
-              <input
-                type="text"
-                value={formData.companyName}
-                onChange={(e) => updateFormData('companyName', e.target.value)}
-                placeholder="Your Company Name"
-                className="aif-input"
-              />
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">Contact Name *</label>
-              <input
-                type="text"
-                value={formData.contactName}
-                onChange={(e) => updateFormData('contactName', e.target.value)}
-                placeholder="Your Full Name"
-                className="aif-input"
-                required
-              />
-              {formData.contactName && formData.contactName.length < 2 && (
-                <div className="aif-validation-error">
-                  Please enter your full name
-                </div>
-              )}
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">Your Location</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => updateFormData('location', e.target.value)}
-                placeholder="City, Country"
-                className="aif-input"
-              />
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">GitHub URL</label>
-              <input
-                type="url"
-                value={formData.githubUrl}
-                onChange={(e) => updateFormData('githubUrl', e.target.value)}
-                placeholder="https://github.com/yourusername"
-                className="aif-input"
-              />
-              {formData.githubUrl && !validateUrl(formData.githubUrl) && (
-                <div className="aif-validation-error">
-                  Please enter a valid URL
-                </div>
-              )}
-              {formData.githubUrl && !formData.githubUrl.includes('github.com') && (
+        case 4:
+          return (
+            <div className="aif-step-content" ref={stepContentRef}>
+              <div className="aif-contact-info-header">
+                <h3>Contact Information</h3>
+                <p className="aif-contact-subtitle">
+                  We'll use this information to personalize your analysis and for future updates.
+                </p>
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">Email Address *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => updateFormData('email', e.target.value)}
+                  placeholder="your.email@example.com"
+                  className="aif-input"
+                  required
+                />
+                {formData.email && !validateEmail(formData.email) && (
+                  <div className="aif-validation-error">
+                    Please enter a valid email address
+                  </div>
+                )}
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">Company Name</label>
+                <input
+                  type="text"
+                  value={formData.companyName}
+                  onChange={(e) => updateFormData('companyName', e.target.value)}
+                  placeholder="Your Company Name"
+                  className="aif-input"
+                />
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">Contact Name *</label>
+                <input
+                  type="text"
+                  value={formData.contactName}
+                  onChange={(e) => updateFormData('contactName', e.target.value)}
+                  placeholder="Your Full Name"
+                  className="aif-input"
+                  required
+                />
+                {formData.contactName && formData.contactName.length < 2 && (
+                  <div className="aif-validation-error">
+                    Please enter your full name
+                  </div>
+                )}
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">Your Location</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => updateFormData('location', e.target.value)}
+                  placeholder="City, Country"
+                  className="aif-input"
+                />
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">GitHub URL</label>
+                <input
+                  type="url"
+                  value={formData.githubUrl}
+                  onChange={(e) => updateFormData('githubUrl', e.target.value)}
+                  placeholder="https://github.com/yourusername"
+                  className="aif-input"
+                />
+                {formData.githubUrl && !validateUrl(formData.githubUrl) && (
+                  <div className="aif-validation-error">
+                    Please enter a valid URL
+                  </div>
+                )}
+                {formData.githubUrl && !formData.githubUrl.includes('github.com') && (
+                  <div className="aif-validation-hint">
+                    Make sure this is a GitHub URL
+                  </div>
+                )}
+              </div>
+        
+              {/* X (Twitter) URL Field */}
+              <div className="aif-form-group">
+                <label className="aif-label">X (Twitter) URL</label>
+                <input
+                  type="url"
+                  value={formData.xUrl || ''}
+                  onChange={(e) => updateFormData('xUrl', e.target.value)}
+                  placeholder="https://x.com/yourusername"
+                  className="aif-input"
+                />
+                {formData.xUrl && !validateUrl(formData.xUrl) && (
+                  <div className="aif-validation-error">
+                    Please enter a valid URL
+                  </div>
+                )}
+               
+              </div>
+        
+              {/* LinkedIn URL Field */}
+              <div className="aif-form-group">
+                <label className="aif-label">LinkedIn Profile URL</label>
+                <input
+                  type="url"
+                  value={formData.linkedinUrl || ''}
+                  onChange={(e) => updateFormData('linkedinUrl', e.target.value)}
+                  placeholder="https://linkedin.com/in/yourprofile"
+                  className="aif-input"
+                />
+                {formData.linkedinUrl && !validateLinkedinUrl(formData.linkedinUrl) && (
+                  <div className="aif-validation-error">
+                    Please enter a valid LinkedIn URL
+                  </div>
+                )}
                 <div className="aif-validation-hint">
-                  Make sure this is a GitHub URL
+                  Optional: We'll use this for social sharing if enabled in automation settings
                 </div>
-              )}
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">Launch Date</label>
-              <input
-                type="date"
-                value={formData.launchDate}
-                onChange={(e) => updateFormData('launchDate', e.target.value)}
-                className="aif-input"
-              />
-              <div className="aif-validation-hint">
-                If your app hasn't launched yet, enter your estimated launch date
+              </div>
+        
+              <div className="aif-form-group">
+                <label className="aif-label">Launch Date</label>
+                <input
+                  type="date"
+                  value={formData.launchDate}
+                  onChange={(e) => updateFormData('launchDate', e.target.value)}
+                  className="aif-input"
+                />
+                <div className="aif-validation-hint">
+                  If your app hasn't launched yet, enter your estimated launch date
+                </div>
+              </div>
+        
+              {/* Is Released Toggle Field */}
+              <div className="aif-form-group">
+                <div className="aif-toggle-group">
+                  <label className="aif-toggle-label">
+                    <div className="aif-toggle-header">
+                      <span className="aif-toggle-title">Is your app released?</span>
+                      <label className="aif-switch">
+                        <input
+                          type="checkbox"
+                          checked={formData.isReleased || false}
+                          onChange={(e) => updateFormData('isReleased', e.target.checked)}
+                        />
+                        <span className="aif-slider"></span>
+                      </label>
+                    </div>
+                    <div className="aif-toggle-description">
+                      Toggle this on if your app is currently live and available to users.
+                      This helps us tailor the analysis for live vs. upcoming apps.
+                    </div>
+                    {formData.isReleased && (
+                      <div className="aif-released-note">
+                        ✅ Your app is marked as released. We'll focus on optimization insights.
+                      </div>
+                    )}
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
-        );
-
+          );
       case 5: // NEW AUTOMATION STEP
         return (
           <div className="aif-step-content" ref={stepContentRef}>
@@ -707,25 +776,6 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
               <p className="aif-automation-subtitle">
                 Enable these features to automate your workflow and share insights.
               </p>
-            </div>
-
-            <div className="aif-form-group">
-              <label className="aif-label">LinkedIn Profile URL</label>
-              <input
-                type="url"
-                value={formData.linkedinUrl || ''}
-                onChange={(e) => updateFormData('linkedinUrl', e.target.value)}
-                placeholder="https://linkedin.com/in/yourprofile"
-                className="aif-input"
-              />
-              {formData.linkedinUrl && !validateLinkedinUrl(formData.linkedinUrl) && (
-                <div className="aif-validation-error">
-                  Please enter a valid LinkedIn URL
-                </div>
-              )}
-              <div className="aif-validation-hint">
-                Optional: We'll use this for social sharing if enabled below
-              </div>
             </div>
 
             <div className="aif-automation-features">
