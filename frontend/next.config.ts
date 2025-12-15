@@ -2,9 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
+  // REMOVE this entire experimental section:
+  // experimental: {
+  //   serverComponentsExternalPackages: [],
+  // },
+  
+  // If you need external packages, use this instead:
+  serverExternalPackages: [], // Add packages like 'xlsx' here if needed
+  
   async headers() {
     return [
       {

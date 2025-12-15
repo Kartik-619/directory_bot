@@ -159,7 +159,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       console.log('🚀 Submitting app info for analysis:', formData);
       
       // Get sites first
-      const sitesResponse = await fetch('http://localhost:3004/api/sites');
+      const sitesResponse = await fetch('https://directory-bot.onrender.com/api/sites');
       if (!sitesResponse.ok) {
         throw new Error(`Failed to fetch sites: ${sitesResponse.status}`);
       }
@@ -183,7 +183,7 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         try {
           console.log(`📍 Analyzing site ${i + 1}/${limitedSiteUrls.length}: ${siteUrl}`);
           
-          const analysisResponse = await fetch('http://localhost:3004/api/analyze-site', {
+          const analysisResponse = await fetch('https://directory-bot.onrender.com/api/analyze-site', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
