@@ -620,7 +620,6 @@ app.post('/api/analyze-site', async (req: Request, res: Response) => {
                 appName: appInfo.name || 'Unnamed App',
                 mode: 'exact-user-input',
                 description: 'Answers are EXACT user input values',
-                savedToGoogleSheets: true,
                 inputVerification: {
                     githubUrl: appInfo.githubUrl ? '✓ Provided' : '✗ Not provided',
                     linkedinUrl: appInfo.linkedinUrl ? '✓ Provided' : '✗ Not provided',
@@ -830,7 +829,6 @@ try {
         console.log('📋 DESCRIPTION: Returns EXACTLY what you input');
         console.log('❌ NO default values, NO modifications');
         console.log('✅ Empty string if field not provided');
-        console.log('☁️  All data saved to Google Sheets');
         console.log('══════════════════════════════════════════\n');
         
         console.log('🛠️ ENDPOINTS:');
@@ -852,12 +850,6 @@ try {
         console.log('  Question: "What is your GitHub?"');
         console.log('  Answer: "https://github.com/myusername"');
         console.log('  (No modifications, no defaults)');
-        
-        console.log('\n☁️  GOOGLE SHEETS SAVES:');
-        console.log('  • All form data saved to cloud spreadsheet');
-        console.log('  • Timestamp of submission');
-        console.log('  • All URLs, contact info, and app details');
-        console.log('  • Analysis target site');
         
         console.log('\n⚠️  NOTE: If field is empty in form, answer will be empty string');
         console.log('\n✅ Server ready! Send your appInfo to /api/analyze-site');
