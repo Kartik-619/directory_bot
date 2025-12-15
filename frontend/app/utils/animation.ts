@@ -20,9 +20,9 @@ export const SiteCardAnimations = {
   },
 
   handleCardHover: (
-    cardRef: RefObject<HTMLElement>, 
-    iconRef?: RefObject<HTMLElement>, 
-    arrowRef?: RefObject<HTMLElement>
+    cardRef: RefObject<HTMLElement | null>, 
+    iconRef?: RefObject<HTMLElement | null>, 
+    arrowRef?: RefObject<HTMLElement | null>
   ) => {
     const enter = () => {
       if (cardRef.current) {
