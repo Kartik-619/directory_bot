@@ -498,7 +498,6 @@ app.get('/api/health', async (req: Request, res: Response) => {
     try {
         const dataFileExists = fs.existsSync(path.resolve(process.cwd(), DATA_FILE_PATH));
         const googleSheetsConfigured = !!(GOOGLE_SHEETS_CLIENT_EMAIL && GOOGLE_SHEETS_PRIVATE_KEY && GOOGLE_SHEETS_SPREADSHEET_ID);
-        
         res.status(200).json({ 
             status: 'healthy', 
             timestamp: new Date().toISOString(),
