@@ -46,7 +46,12 @@ export default function ResultsPage() {
         throw new Error('Invalid analysis data format.');
       }
 
-      setAnalysisResults(latestAnalysis.analyses);
+      // FIX: Remove duplicate sites before setting state
+      const uniqueAnalyses = latestAnalysis.analyses.filter((site: SiteAnalysis, index: number, self: SiteAnalysis[]) =>
+        index === self.findIndex((s) => s.siteUrl === site.siteUrl)
+      );
+
+      setAnalysisResults(uniqueAnalyses);
       setAppInfo(latestAnalysis.appInfo);
       
     } catch (err) {
@@ -146,9 +151,11 @@ export default function ResultsPage() {
         </p>
         
         <div className="sites-grid-container">
-          {analysisResults.map((siteAnalysis) => (
+          {/* FIX: Added index parameter to map function */}
+          {analysisResults.map((siteAnalysis, index) => (
             <div 
-              key={siteAnalysis.siteUrl} 
+              // FIX: Added index to the key to make it unique
+              key={`${siteAnalysis.siteUrl}-${index}`}
               className={`site-grid-card ${selectedSite?.siteUrl === siteAnalysis.siteUrl ? 'active' : ''}`}
               onClick={() => setSelectedSite(siteAnalysis)}
             >

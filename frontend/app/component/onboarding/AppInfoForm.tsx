@@ -163,10 +163,15 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
       if (!sitesResponse.ok) {
         throw new Error(`Failed to fetch sites: ${sitesResponse.status}`);
       }
-      const siteUrls: string[] = await sitesResponse.json();
+      const sitesData = await sitesResponse.json();
+      const sitesArray = Array.isArray(sitesData.sites) ? sitesData.sites : [];
+      const siteUrls = sitesArray.map((site: any) => site.url).filter((url: string) => url);
       
+      if (siteUrls.length === 0) {
+        throw new Error('No directory sites found to analyze');
+      }
       // LIMIT to only 3-5 sites for now to avoid overloading
-      const limitedSiteUrls = siteUrls.slice(0, 15);
+      const limitedSiteUrls = siteUrls.slice(0, 20);
       
       console.log('📋 Sites to analyze (limited):', limitedSiteUrls);
       
