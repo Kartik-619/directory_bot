@@ -22,7 +22,7 @@ interface SiteAnalysis {
   }[];
 }
 
-const appTypes = [
+const appTypes: { value: AppInfo['type']; label: string; icon: string }[] = [
   { value: 'saas', label: 'SaaS Application', icon: '💼' },
   { value: 'ecommerce', label: 'E-commerce Store', icon: '🛒' },
   { value: 'blog', label: 'Blog/Content Site', icon: '📝' },
@@ -294,10 +294,10 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
     }
   };
 
-  const updateFormData = (field: keyof AppInfo, value: any) => {
+  const updateFormData = <K extends keyof AppInfo>(field: K, value: AppInfo[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
-
+  
   const handleNext = () => {
     if (currentStep < steps.length) {
       if (stepContentRef.current) {
@@ -340,33 +340,6 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
     }
   };
 
-  const handleNewAnalysis = () => {
-    setAnalysisResult(null);
-    setFormData({
-      url: '',
-      name: '',
-      type: 'webapp',
-      description: '',
-      targetAudience: '',
-      mainFeatures: [],
-      techStack: [],
-      email: '',
-      companyName: '',
-      contactName: '',
-      location: '',
-      githubUrl: '',
-      launchDate: '',
-      tagline: '',
-      category: '',
-      linkedinUrl: '',
-      enableGithubActions: false,
-      enableLinkedinSharing: false,
-      xUrl: '', // Add X (Twitter) URL field
-      isReleased: false, // Add released toggle
-    });
-    setCurrentStep(1);
-    setError(null);
-  };
 
   const toggleArrayItem = (array: string[], item: string): string[] => {
     return array.includes(item) 
@@ -468,20 +441,20 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
               <label className="aif-label">App Type *</label>
               <div className="aif-type-grid">
                 {appTypes.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={(e) => {
-                      updateFormData('type', type.value);
-                      animateButtonClick(e.currentTarget);
-                    }}
-                    className={`aif-type-btn ${
-                      formData.type === type.value ? 'aif-type-selected' : ''
-                    }`}
-                  >
-                    <div className="aif-type-icon">{type.icon}</div>
-                    <div className="aif-type-label">{type.label}</div>
-                  </button>
+              <button
+              key={type.value}
+              type="button"
+              onClick={(e) => {
+                updateFormData('type', type.value);
+                animateButtonClick(e.currentTarget);
+              }}
+              className={`aif-type-btn ${
+                formData.type === type.value ? 'aif-type-selected' : ''
+              }`}
+            >
+              <div className="aif-type-icon">{type.icon}</div>
+              <div className="aif-type-label">{type.label}</div>
+            </button>
                 ))}
               </div>
             </div>
@@ -618,7 +591,7 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
               <div className="aif-contact-info-header">
                 <h3>Contact Information</h3>
                 <p className="aif-contact-subtitle">
-                  We'll use this information to personalize your analysis and for future updates.
+                  We will use this information to personalize your analysis and for future updates.
                 </p>
               </div>
         
@@ -733,7 +706,7 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
                   </div>
                 )}
                 <div className="aif-validation-hint">
-                  Optional: We'll use this for social sharing if enabled in automation settings
+                  Optional: We will use this for social sharing if enabled in automation settings
                 </div>
               </div>
         
@@ -746,7 +719,7 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
                   className="aif-input"
                 />
                 <div className="aif-validation-hint">
-                  If your app hasn't launched yet, enter your estimated launch date
+                  If your app is not launched yet, enter your estimated launch date
                 </div>
               </div>
         
@@ -757,11 +730,11 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
                     <div className="aif-toggle-header">
                       <span className="aif-toggle-title">Is your app released?</span>
                       <label className="aif-switch">
-                        <input
-                          type="checkbox"
-                          checked={formData.isReleased || false}
-                          onChange={(e) => updateFormData('isReleased', e.target.checked)}
-                        />
+                      <input
+  type="checkbox"
+  checked={formData.isReleased}
+  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateFormData('isReleased', e.target.checked)}
+/>
                         <span className="aif-slider"></span>
                       </label>
                     </div>
@@ -771,7 +744,7 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
                     </div>
                     {formData.isReleased && (
                       <div className="aif-released-note">
-                        ✅ Your app is marked as released. We'll focus on optimization insights.
+                        ✅ Your app is marked as released. We will focus on optimization insights.
                       </div>
                     )}
                   </label>
@@ -852,7 +825,7 @@ const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: strin
             <div className="aif-review-alert">
               <h3>Ready to analyze your app!</h3>
               <p>
-                Based on your information, we'll analyze up to 5 directory sites and provide
+                Based on your information, we will analyze up to 5 directory sites and provide
                 specific insights for your app.
               </p>
               <p className="aif-note">

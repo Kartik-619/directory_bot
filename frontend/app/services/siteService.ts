@@ -1,4 +1,5 @@
-import { Site } from '../types/site';  // Changed from '@/types/site'
+// app/services/siteService.ts
+import { Site } from '../types/site';
 import { AppInfo } from '../types/onboarding';
 
 // Define the structure for custom answers response
@@ -23,18 +24,21 @@ interface GenerateCustomAnswersResponse {
 export class SiteService {
   private static readonly API_BASE_URL = 'https://directory-bot.onrender.com/api';
 
+  /** Fetch all sites */
   static async fetchSites(): Promise<Site[]> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/sites`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const siteUrls: string[] = await response.json();
+
+      // Explicitly type the response as string[]
+      const siteUrls: string[] = (await response.json()) as string[];
+
       return siteUrls.map(url => ({
         url,
-        name: this.getDisplayName(url)
+        name: this.getDisplayName(url),
       }));
     } catch (error) {
       console.error('Error fetching sites:', error);
@@ -42,6 +46,7 @@ export class SiteService {
     }
   }
 
+  /** Generate custom answers for a given app info */
   static async generateCustomAnswers(appInfo: AppInfo): Promise<GenerateCustomAnswersResponse> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/generate-custom-answers`, {
@@ -51,12 +56,14 @@ export class SiteService {
         },
         body: JSON.stringify({ appInfo }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const data: GenerateCustomAnswersResponse = await response.json();
+
+      // Explicitly type the JSON response
+      const data: GenerateCustomAnswersResponse = (await response.json()) as GenerateCustomAnswersResponse;
+
       return data;
     } catch (error) {
       console.error('Error generating custom answers:', error);
@@ -64,6 +71,7 @@ export class SiteService {
     }
   }
 
+  /** Get display name for a site URL */
   static getDisplayName(url: string): string {
     try {
       const domain = new URL(url).hostname;
@@ -73,6 +81,7 @@ export class SiteService {
     }
   }
 
+  /** Get icon (first letter) for a site URL */
   static getSiteIcon(url: string): string {
     try {
       const domain = new URL(url).hostname;

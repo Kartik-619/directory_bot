@@ -1,9 +1,9 @@
 "use client";
 export const revalidate = 0;
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import './results.css';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import "./results.css";
 
 // Define the structure for site analysis results
 interface SiteAnalysis {
@@ -22,7 +22,7 @@ interface AppInfo {
   targetAudience?: string;
   type?: string;
   mainFeatures?: string[];
-  [key: string]: unknown; // For any additional properties
+  [key: string]: unknown; // For additional properties
 }
 
 // Define the structure for the stored analysis
@@ -30,7 +30,7 @@ interface StoredAnalysis {
   appInfo: AppInfo;
   analyses: SiteAnalysis[];
   timestamp?: string;
-  [key: string]: unknown; // For any additional properties
+  [key: string]: unknown;
 }
 
 export default function ResultsPage() {
@@ -46,57 +46,50 @@ export default function ResultsPage() {
   }, []);
 
   const loadAnalysisResults = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // Get saved analysis from localStorage
-      const savedAnalysis = localStorage.getItem('app_analysis_results');
+      const savedAnalysis = localStorage.getItem("app_analysis_results");
       if (!savedAnalysis) {
-        throw new Error('No analysis results found. Please complete the analysis first.');
+        throw new Error("No analysis results found. Please complete the analysis first.");
       }
 
       const parsed: StoredAnalysis[] = JSON.parse(savedAnalysis);
-      
-      // Get the most recent analysis
+
       const latestAnalysis = parsed[0];
-      
-      if (!latestAnalysis || !latestAnalysis.analyses) {
-        throw new Error('Invalid analysis data format.');
+      if (!latestAnalysis?.analyses) {
+        throw new Error("Invalid analysis data format.");
       }
 
-      // Fix: Remove duplicate sites before setting state
-      const uniqueAnalyses = latestAnalysis.analyses.filter((site, index, self) =>
-        index === self.findIndex((s) => s.siteUrl === site.siteUrl)
+      const uniqueAnalyses = latestAnalysis.analyses.filter(
+        (site, index, self) => index === self.findIndex((s) => s.siteUrl === site.siteUrl)
       );
 
       setAnalysisResults(uniqueAnalyses);
       setAppInfo(latestAnalysis.appInfo);
-      
-    } catch (err) {
-      console.error('Error loading analysis:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load analysis');
+    } catch (error: unknown) {
+      // Type-safe error handling
+      const message = error instanceof Error ? error.message : "Failed to load analysis";
+      console.error("Error loading analysis:", error);
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNewAnalysis = () => {
-    localStorage.removeItem('app_analysis_results');
-    router.push('/');
+    localStorage.removeItem("app_analysis_results");
+    router.push("/");
   };
 
-  const getSiteDomain = (url: string): string => {
+  const getSiteDomain = (url: string) => {
     try {
-      const urlObj = new URL(url);
-      return urlObj.hostname.replace(/^www\./, '');
+      return new URL(url).hostname.replace(/^www\./, "");
     } catch {
-      return url.replace(/^https?:\/\//, '').split('/')[0];
+      return url.replace(/^https?:\/\//, "").split("/")[0];
     }
   };
 
-  const getSiteInitial = (siteName: string): string => {
-    return siteName.charAt(0).toUpperCase();
-  };
+  const getSiteInitial = (siteName: string) => siteName.charAt(0).toUpperCase();
 
   if (isLoading) {
     return (
@@ -112,7 +105,7 @@ export default function ResultsPage() {
       <div className="results-error">
         <h2>⚠️ Error Loading Results</h2>
         <p>{error}</p>
-        <button onClick={() => router.push('/')} className="action-btn primary">
+        <button onClick={() => router.push("/")} className="action-btn primary">
           Start New Analysis
         </button>
       </div>
@@ -125,21 +118,20 @@ export default function ResultsPage() {
         <div className="header-content">
           <h1>🎯 Your Analysis Results</h1>
           <p className="subtitle">
-            Insights for <strong>{appInfo?.name || 'Your App'}</strong>
+            Insights for <strong>{appInfo?.name || "Your App"}</strong>
             {appInfo?.targetAudience && ` targeting ${appInfo.targetAudience}`}
           </p>
         </div>
-        
+
         <div className="app-info-summary">
           <div className="info-item">
             <span className="label">App Type:</span>
-            <span className="value">{appInfo?.type || 'Not specified'}</span>
+            <span className="value">{appInfo?.type || "Not specified"}</span>
           </div>
           <div className="info-item">
             <span className="label">Features:</span>
             <span className="value">
-              {appInfo?.mainFeatures?.slice(0, 3).join(', ') || 'None'}
-              
+              {appInfo?.mainFeatures?.slice(0, 3).join(", ") || "None"}
             </span>
           </div>
         </div>
@@ -167,54 +159,42 @@ export default function ResultsPage() {
         <p className="section-description">
           Click on any site card to view detailed answers. Each site was analyzed with questions specific to it.
         </p>
-        
+
         <div className="sites-grid-container">
           {analysisResults.map((siteAnalysis, index) => (
-            <div 
+            <div
               key={`${siteAnalysis.siteUrl}-${index}`}
-              className={`site-grid-card ${selectedSite?.siteUrl === siteAnalysis.siteUrl ? 'active' : ''}`}
+              className={`site-grid-card ${selectedSite?.siteUrl === siteAnalysis.siteUrl ? "active" : ""}`}
               onClick={() => setSelectedSite(siteAnalysis)}
             >
-              <div className="site-icon">
-                {getSiteInitial(siteAnalysis.siteName)}
-              </div>
+              <div className="site-icon">{getSiteInitial(siteAnalysis.siteName)}</div>
               <div className="site-info">
                 <h3 className="site-domain">{getSiteDomain(siteAnalysis.siteUrl)}</h3>
                 <p className="site-url">{siteAnalysis.siteUrl}</p>
-                <span className="questions-badge">
-                  {siteAnalysis.questions.length} questions
-                </span>
+                <span className="questions-badge">{siteAnalysis.questions.length} questions</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Questions Modal */}
       {selectedSite && (
         <div className="questions-modal-overlay" onClick={() => setSelectedSite(null)}>
           <div className="questions-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-header-content">
-                <div className="modal-site-icon">
-                  {getSiteInitial(selectedSite.siteName)}
-                </div>
+                <div className="modal-site-icon">{getSiteInitial(selectedSite.siteName)}</div>
                 <div className="modal-site-info">
                   <h2>{selectedSite.siteName}</h2>
                   <p className="modal-site-url">{selectedSite.siteUrl}</p>
-                  <span className="questions-badge">
-                    {selectedSite.questions.length} questions analyzed
-                  </span>
+                  <span className="questions-badge">{selectedSite.questions.length} questions analyzed</span>
                 </div>
               </div>
-              <button 
-                className="close-modal-btn"
-                onClick={() => setSelectedSite(null)}
-              >
+              <button className="close-modal-btn" onClick={() => setSelectedSite(null)}>
                 ×
               </button>
             </div>
-            
+
             <div className="modal-content">
               <div className="modal-questions-list">
                 {selectedSite.questions.map((q) => (

@@ -24,6 +24,6 @@ export interface AppInfo {
   linkedinUrl: string;
   enableGithubActions: boolean;
   enableLinkedinSharing: boolean;
-  xUrl: '', // Add X (Twitter) URL field
-  isReleased: false, // Add released toggle
+  xUrl: string;// Add X (Twitter) URL field
+  isReleased: boolean; // Add released toggle
 }
