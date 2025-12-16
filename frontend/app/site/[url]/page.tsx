@@ -36,7 +36,7 @@ interface CustomAnswersResponse {
 
 export default function SitePage() {
   const params = useParams();
-  const router = useRouter();
+  
   const { appInfo } = useOnboarding();
   const [siteData, setSiteData] = useState<SiteResult | null>(null);
   const [loading, setLoading] = useState(false);

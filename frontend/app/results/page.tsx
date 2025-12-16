@@ -18,10 +18,10 @@ siteName: string;
 
 // Define the structure for app information
 interface AppInfo {
- name?: string;
- targetAudience?: string;
- type?: string;
- mainFeatures?: string[];
+  name?: string;
+  targetAudience?: string;
+  type?: string;
+  mainFeatures?: string[];
  // [key: string]: unknown; // FIX: Removing the index signature should resolve the error if all used properties are listed above.
 }
 

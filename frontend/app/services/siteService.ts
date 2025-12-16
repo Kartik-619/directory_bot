@@ -41,8 +41,8 @@ if (!response.ok) {
 }
 
  // Explicitly type the response object
- const data = (await response.json()) as FetchSitesResponse;
-const siteUrls: string[] = data.sites; // Assuming the actual array is inside a 'sites' property
+ const data = (await response.json()) as { sites: string[] };
+ const siteUrls: string[] = data.sites; // Assuming the actual array is inside a 'sites' property
 
  return siteUrls.map(url => ({
  url,
