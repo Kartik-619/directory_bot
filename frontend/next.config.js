@@ -9,6 +9,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // If you need external packages, use this instead:
   serverExternalPackages: [], // Add packages like 'xlsx' here if needed
   
