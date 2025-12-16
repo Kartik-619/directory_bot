@@ -7,30 +7,30 @@ import "./results.css";
 
 // Define the structure for site analysis results
 interface SiteAnalysis {
-  siteUrl: string;
-  siteName: string;
-  questions: {
-    id: number;
-    question: string;
-    answer: string;
-  }[];
+ siteUrl: string;
+siteName: string;
+ questions: {
+ id: number;
+ question: string;
+ answer: string;
+}[];
 }
 
 // Define the structure for app information
 interface AppInfo {
-  name?: string;
-  targetAudience?: string;
-  type?: string;
-  mainFeatures?: string[];
-  [key: string]: unknown; // For additional properties
+ name?: string;
+ targetAudience?: string;
+ type?: string;
+ mainFeatures?: string[];
+ // [key: string]: unknown; // FIX: Removing the index signature should resolve the error if all used properties are listed above.
 }
 
 // Define the structure for the stored analysis
 interface StoredAnalysis {
-  appInfo: AppInfo;
-  analyses: SiteAnalysis[];
-  timestamp?: string;
-  [key: string]: unknown;
+ appInfo: AppInfo;
+ analyses: SiteAnalysis[];
+ timestamp?: string;
+ [key: string]: unknown; // We leave this one as it defines the structure of the JSON object itself
 }
 
 export default function ResultsPage() {

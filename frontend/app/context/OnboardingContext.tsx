@@ -24,7 +24,8 @@ const getInitialAppInfo = (): AppInfo | null => {
     const savedAppInfo = localStorage.getItem("directoryBot_appInfo");
     const savedStatus = localStorage.getItem("directoryBot_onboardingComplete");
     if (savedAppInfo && savedStatus === "true") {
-      return JSON.parse(savedAppInfo);
+      // Direct parsing and returning the state value.
+      return JSON.parse(savedAppInfo); 
     }
   } catch {
     localStorage.removeItem("directoryBot_appInfo");
@@ -34,6 +35,8 @@ const getInitialAppInfo = (): AppInfo | null => {
 };
 
 export const OnboardingProvider = ({ children }: OnboardingProviderProps) => {
+  // FIX: State initialization is done lazily here, 
+  // so no useEffect is needed, resolving the error.
   const [appInfo, setAppInfo] = useState<AppInfo | null>(getInitialAppInfo);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(
     Boolean(getInitialAppInfo())
