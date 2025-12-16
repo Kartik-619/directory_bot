@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useSyncExternalStore } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AppInfo } from '../types/onboarding';
 
 interface OnboardingContextType {
@@ -16,71 +16,35 @@ interface OnboardingProviderProps {
   children: ReactNode;
 }
 
-// Create a store for localStorage synchronization
-const createOnboardingStore = () => {
-  let appInfo: AppInfo | null = null;
-  let isOnboardingComplete = false;
-  let listeners: (() => void)[] = [];
+export const OnboardingProvider = ({ children }: OnboardingProviderProps) => {
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const loadFromStorage = () => {
+  // Load onboarding state from localStorage on mount
+  useEffect(() => {
     const savedAppInfo = localStorage.getItem('directoryBot_appInfo');
     const savedOnboardingStatus = localStorage.getItem('directoryBot_onboardingComplete');
     
     if (savedAppInfo && savedOnboardingStatus === 'true') {
       try {
-        appInfo = JSON.parse(savedAppInfo);
-        isOnboardingComplete = true;
+        const parsedAppInfo = JSON.parse(savedAppInfo);
+        setAppInfo(parsedAppInfo);
+        setIsOnboardingComplete(true);
       } catch (error) {
         console.error('Error parsing saved app info:', error);
+        // Clear corrupted data
         localStorage.removeItem('directoryBot_appInfo');
         localStorage.removeItem('directoryBot_onboardingComplete');
-        appInfo = null;
-        isOnboardingComplete = false;
       }
     }
-  };
-
-  // Initial load
-  if (typeof window !== 'undefined') {
-    loadFromStorage();
-  }
-
-  return {
-    getAppInfo: () => appInfo,
-    getIsOnboardingComplete: () => isOnboardingComplete,
-    setAppInfo: (newAppInfo: AppInfo | null) => {
-      appInfo = newAppInfo;
-      listeners.forEach(listener => listener());
-    },
-    setIsOnboardingComplete: (complete: boolean) => {
-      isOnboardingComplete = complete;
-      listeners.forEach(listener => listener());
-    },
-    subscribe: (listener: () => void) => {
-      listeners.push(listener);
-      return () => {
-        listeners = listeners.filter(l => l !== listener);
-      };
-    }
-  };
-};
-
-const onboardingStore = createOnboardingStore();
-
-export const OnboardingProvider = ({ children }: OnboardingProviderProps) => {
-  const appInfo = useSyncExternalStore(
-    onboardingStore.subscribe,
-    onboardingStore.getAppInfo
-  );
-  
-  const isOnboardingComplete = useSyncExternalStore(
-    onboardingStore.subscribe,
-    onboardingStore.getIsOnboardingComplete
-  );
+    
+    setIsInitialized(true);
+  }, []);
 
   const completeOnboarding = (newAppInfo: AppInfo) => {
-    onboardingStore.setAppInfo(newAppInfo);
-    onboardingStore.setIsOnboardingComplete(true);
+    setAppInfo(newAppInfo);
+    setIsOnboardingComplete(true);
     
     // Save to localStorage
     localStorage.setItem('directoryBot_appInfo', JSON.stringify(newAppInfo));
@@ -88,8 +52,8 @@ export const OnboardingProvider = ({ children }: OnboardingProviderProps) => {
   };
 
   const resetOnboarding = () => {
-    onboardingStore.setAppInfo(null);
-    onboardingStore.setIsOnboardingComplete(false);
+    setAppInfo(null);
+    setIsOnboardingComplete(false);
     
     // Clear localStorage
     localStorage.removeItem('directoryBot_appInfo');
