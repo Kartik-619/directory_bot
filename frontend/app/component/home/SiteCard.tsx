@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Site } from '../../types/site';
 import { SiteService } from '../../services/siteService';
@@ -13,15 +13,25 @@ export const SiteCard = ({ site }: SiteCardProps) => {
   const iconRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
 
-  const { enter, leave } = SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef);
+  const handleMouseEnter = useCallback(() => {
+    if (cardRef.current && iconRef.current && arrowRef.current) {
+      SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef).enter();
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (cardRef.current && iconRef.current && arrowRef.current) {
+      SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef).leave();
+    }
+  }, []);
 
   return (
     <Link href={`/site/${encodeURIComponent(site.url)}`} passHref>
       <div 
         className="site-card"
         ref={cardRef}
-        onMouseEnter={enter}
-        onMouseLeave={leave}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         role="link"
         tabIndex={0}
         style={{ cursor: 'pointer' }}

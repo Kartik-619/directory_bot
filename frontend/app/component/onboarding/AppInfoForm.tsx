@@ -164,9 +164,15 @@ export const AppInfoForm = ({ onSubmit, onBack }: AppInfoFormProps) => {
         throw new Error(`Failed to fetch sites: ${sitesResponse.status}`);
       }
       const sitesData = await sitesResponse.json();
-      const sitesArray = Array.isArray(sitesData.sites) ? sitesData.sites : [];
-      const siteUrls = sitesArray.map((site: any) => site.url).filter((url: string) => url);
-      
+     // To this:
+interface SiteData {
+  url: string;
+  // Add other properties if they exist
+  [key: string]: unknown;
+}
+
+const sitesArray = Array.isArray(sitesData.sites) ? sitesData.sites as SiteData[] : [];
+const siteUrls = sitesArray.map((site: SiteData) => site.url).filter((url: string) => url);
       if (siteUrls.length === 0) {
         throw new Error('No directory sites found to analyze');
       }
