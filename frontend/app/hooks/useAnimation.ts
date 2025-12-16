@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { SiteCardAnimations } from '../utils/animation';
 
@@ -12,7 +12,7 @@ export const usePageAnimation = (sites: any[], loading: boolean) => {
     }
   }, [loading, sites]);
 
-  const animatePageIn = () => {
+  const animatePageIn = useCallback(() => {
     if (headerRef.current) {
       gsap.fromTo(headerRef.current, 
         { y: -50, opacity: 0 },
@@ -23,7 +23,7 @@ export const usePageAnimation = (sites: any[], loading: boolean) => {
     if (gridRef.current) {
       SiteCardAnimations.animateGridIn(gridRef.current);
     }
-  };
+  },[]);
 
   return { headerRef, gridRef };
 };

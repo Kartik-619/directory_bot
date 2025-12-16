@@ -1,6 +1,25 @@
 import { Site } from '../types/site';  // Changed from '@/types/site'
 import { AppInfo } from '../types/onboarding';
 
+// Define the structure for custom answers response
+interface CustomAnswer {
+  id: number;
+  question: string;
+  answer: string;
+}
+
+interface SiteCustomAnswers {
+  siteUrl: string;
+  siteName: string;
+  questions: CustomAnswer[];
+}
+
+interface GenerateCustomAnswersResponse {
+  appInfo: AppInfo;
+  analyses: SiteCustomAnswers[];
+  timestamp: string;
+}
+
 export class SiteService {
   private static readonly API_BASE_URL = 'https://directory-bot.onrender.com/api';
 
@@ -23,7 +42,7 @@ export class SiteService {
     }
   }
 
-  static async generateCustomAnswers(appInfo: AppInfo): Promise<any> {
+  static async generateCustomAnswers(appInfo: AppInfo): Promise<GenerateCustomAnswersResponse> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/generate-custom-answers`, {
         method: 'POST',
@@ -37,7 +56,8 @@ export class SiteService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data: GenerateCustomAnswersResponse = await response.json();
+      return data;
     } catch (error) {
       console.error('Error generating custom answers:', error);
       throw new Error('Failed to generate custom answers. Make sure the backend is running.');

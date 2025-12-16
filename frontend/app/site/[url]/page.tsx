@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useOnboarding } from '../../context/OnboardingContext';
 import { SiteService } from '../../services/siteService';
 
+// Define the interfaces locally since they might differ from SiteService
 interface SiteQuestion {
   id: number;
   question: string;
@@ -16,6 +17,21 @@ interface SiteQuestion {
 interface SiteResult {
   siteUrl: string;
   questions: SiteQuestion[];
+}
+
+// Interface for the custom answers response
+interface CustomAnswersResponse {
+  appInfo: any; // You might want to define a proper type
+  analyses: {
+    siteUrl: string;
+    siteName: string;
+    questions: Array<{
+      id: number;
+      question: string;
+      answer: string;
+    }>;
+  }[];
+  timestamp: string;
 }
 
 export default function SitePage() {
@@ -42,8 +58,28 @@ export default function SitePage() {
       let data: SiteResult;
       
       if (isCustomAnalysis && appInfo) {
-        // Use custom analysis endpoint
-        data = await SiteService.generateCustomAnswers(appInfo);
+        // Use custom analysis endpoint - returns multiple sites
+        const customResponse = await SiteService.generateCustomAnswers(appInfo);
+        
+        // Find the site that matches our current URL or use the first one
+        // Since custom analysis returns multiple sites, we need to select one
+        const matchedSite = customResponse.analyses.find(
+          analysis => analysis.siteUrl === siteUrl || 
+                     analysis.siteName.toLowerCase().includes(appInfo.name.toLowerCase())
+        ) || customResponse.analyses[0]; // Fallback to first site
+        
+        if (!matchedSite) {
+          throw new Error('No site data found in custom analysis response');
+        }
+        
+        // Convert the response format to match SiteResult
+        data = {
+          siteUrl: matchedSite.siteUrl,
+          questions: matchedSite.questions.map(q => ({
+            ...q,
+            sources: [] // Add empty sources array if not present
+          }))
+        };
       } else {
         // Use regular site analysis endpoint
         const response = await fetch('http://localhost:3003/api/generate-answers', {

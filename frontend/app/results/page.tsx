@@ -15,12 +15,29 @@ interface SiteAnalysis {
   }[];
 }
 
+// Define the structure for app information
+interface AppInfo {
+  name?: string;
+  targetAudience?: string;
+  type?: string;
+  mainFeatures?: string[];
+  [key: string]: unknown; // For any additional properties
+}
+
+// Define the structure for the stored analysis
+interface StoredAnalysis {
+  appInfo: AppInfo;
+  analyses: SiteAnalysis[];
+  timestamp?: string;
+  [key: string]: unknown; // For any additional properties
+}
+
 export default function ResultsPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<SiteAnalysis[]>([]);
-  const [appInfo, setAppInfo] = useState<any>(null);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [selectedSite, setSelectedSite] = useState<SiteAnalysis | null>(null);
 
   useEffect(() => {
@@ -37,7 +54,7 @@ export default function ResultsPage() {
         throw new Error('No analysis results found. Please complete the analysis first.');
       }
 
-      const parsed = JSON.parse(savedAnalysis);
+      const parsed: StoredAnalysis[] = JSON.parse(savedAnalysis);
       
       // Get the most recent analysis
       const latestAnalysis = parsed[0];
@@ -46,8 +63,8 @@ export default function ResultsPage() {
         throw new Error('Invalid analysis data format.');
       }
 
-      // FIX: Remove duplicate sites before setting state
-      const uniqueAnalyses = latestAnalysis.analyses.filter((site: SiteAnalysis, index: number, self: SiteAnalysis[]) =>
+      // Fix: Remove duplicate sites before setting state
+      const uniqueAnalyses = latestAnalysis.analyses.filter((site, index, self) =>
         index === self.findIndex((s) => s.siteUrl === site.siteUrl)
       );
 
@@ -121,7 +138,7 @@ export default function ResultsPage() {
             <span className="label">Features:</span>
             <span className="value">
               {appInfo?.mainFeatures?.slice(0, 3).join(', ') || 'None'}
-              {appInfo?.mainFeatures?.length > 3 && '...'}
+              
             </span>
           </div>
         </div>
@@ -151,10 +168,8 @@ export default function ResultsPage() {
         </p>
         
         <div className="sites-grid-container">
-          {/* FIX: Added index parameter to map function */}
           {analysisResults.map((siteAnalysis, index) => (
             <div 
-              // FIX: Added index to the key to make it unique
               key={`${siteAnalysis.siteUrl}-${index}`}
               className={`site-grid-card ${selectedSite?.siteUrl === siteAnalysis.siteUrl ? 'active' : ''}`}
               onClick={() => setSelectedSite(siteAnalysis)}
