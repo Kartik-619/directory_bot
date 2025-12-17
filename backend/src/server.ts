@@ -16,7 +16,7 @@ const MAX_QUESTIONS_PER_BATCH = 10;
 
 // --- Setup Middlewares ---
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:12000', 'https://directory-bot.vercel.app/','https://work-1-qisfyhentxwgdxaf.prod-runtime.all-hands.dev', 'https://work-2-qisfyhentxwgdxaf.prod-runtime.all-hands.dev']
+    origin: ['http://localhost:3000', 'http://localhost:12000', 'https://directory-bot.vercel.app','https://work-1-qisfyhentxwgdxaf.prod-runtime.all-hands.dev', 'https://work-2-qisfyhentxwgdxaf.prod-runtime.all-hands.dev']
 }));
 app.use(express.json({ limit: '10mb' }));
 
