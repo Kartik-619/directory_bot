@@ -1,4 +1,6 @@
-import { useRef } from 'react';
+// /vercel/path0/frontend/app/component/home/SiteCard.tsx
+
+import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Site } from '../../types/site';
 import { SiteService } from '../../services/siteService';
@@ -13,15 +15,28 @@ export const SiteCard = ({ site }: SiteCardProps) => {
   const iconRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
 
-  const { enter, leave } = SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef);
+  // The logic is correctly moved into event handlers:
+  const handleMouseEnter = useCallback(() => {
+    // Refs are accessed here, within the event handler
+    if (cardRef.current && iconRef.current && arrowRef.current) {
+      SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef).enter();
+    }
+  }, []); // Dependencies are correct
+
+  const handleMouseLeave = useCallback(() => {
+    // Refs are accessed here, within the event handler
+    if (cardRef.current && iconRef.current && arrowRef.current) {
+      SiteCardAnimations.handleCardHover(cardRef, iconRef, arrowRef).leave();
+    }
+  }, []); // Dependencies are correct
 
   return (
     <Link href={`/site/${encodeURIComponent(site.url)}`} passHref>
       <div 
         className="site-card"
         ref={cardRef}
-        onMouseEnter={enter}
-        onMouseLeave={leave}
+        onMouseEnter={handleMouseEnter} // Handlers are used here
+        onMouseLeave={handleMouseLeave} // Handlers are used here
         role="link"
         tabIndex={0}
         style={{ cursor: 'pointer' }}

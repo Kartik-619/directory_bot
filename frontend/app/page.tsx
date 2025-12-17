@@ -7,7 +7,7 @@ import { AppInfo } from "./types/onboarding";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import "./ModernLanding.css";
-
+//add
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
